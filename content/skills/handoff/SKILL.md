@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: "Compact the current conversation into a self-contained handoff document so a fresh agent (new chat, another machine, another AI client) can continue the work without re-discovering the context. References durable artifacts (`openspec/`, `memory.md`, commits, `1c-templates-mcp` notes) instead of duplicating them. Use when the user says 'handoff', 'compact session', 'save context for continuation', or invokes `/handoff`."
+description: "Compact the current conversation into a self-contained handoff document so a fresh agent (new chat, another machine, another AI client) can continue the work without re-discovering the context. References durable artifacts (`openspec/`, `memory.md`, commits, `1c-templates-fastcode` notes) instead of duplicating them. Use when the user says 'handoff', 'compact session', 'save context for continuation', or invokes `/handoff`."
 argument-hint: "Optional: focus of the next session, or a target path/folder for the handoff file."
 ---
 
@@ -68,7 +68,7 @@ Which gates from `verification-checklist.md` passed / failed / were skipped. Lat
 ## Links (DO NOT copy content)
 - `openspec/changes/<id>/proposal.md`, `design.md`, `tasks.md`
 - `memory.md` — relevant sections
-- `1c-templates-mcp` notes — `recall` keys: `<term1>`, `<term2>`
+- `1c-templates-fastcode` notes — `recall` keys: `<term1>`, `<term2>`
 - Commits / PR / Issue
 - ITS articles, platform documentation pages
 ```
@@ -83,7 +83,7 @@ Which gates from `verification-checklist.md` passed / failed / were skipped. Lat
 ## After writing
 
 1. Tell the user the absolute path of the created file and its line count.
-2. If the session produced corrections / facts that may qualify for `memory.md` or `1c-templates-mcp` (`remember`) under `AGENTS.md → Project memory`, **list them separately** as candidates for long-term memory. Do not save automatically (`memory.md` is strict, `remember` is targeted).
+2. If the session produced corrections / facts that may qualify for `memory.md` or `1c-templates-fastcode` (`remember`) under `AGENTS.md → Project memory`, **list them separately** as candidates for long-term memory. Do not save automatically (`memory.md` is strict, `remember` is targeted).
 
 ## Boundaries
 

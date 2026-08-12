@@ -20,7 +20,7 @@ Parse the argument: empty — full pass (collect → cluster → propose → app
 Gather friction signals from, in order:
 
 1. **Current session** — corrections and steers the user gave in this chat that contradict or refine behavior mandated by the active ruleset.
-2. **`recall`** (`1c-templates-mcp`, only when exposed) — query for `rule-friction` notes; refine with behavior keywords if the first query is too broad. Respect the no-blind-chaining discipline of `AGENTS.md → MCP Tool Calling → C`.
+2. **`recall`** (`1c-templates-fastcode`, only when exposed) — query for `rule-friction` notes; refine with behavior keywords if the first query is too broad. Respect the no-blind-chaining discipline of `AGENTS.md → MCP Tool Calling → C`.
 3. **`memory.md` fallback entries** — behavior-steering entries recorded there while `remember` was unavailable.
 4. **User input** passed with the command invocation.
 

@@ -89,18 +89,17 @@ If a criterion cannot be met, say so explicitly in the report — do not present
 
 See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1c-tools` skill (`content/skills/mcp-1c-tools/SKILL.md`) for MCP tool descriptions. Follow the `powershell-windows` skill for shell commands.
 
-**Search discipline:** Follow `content/rules/mcp-first-search.md` — MCP project-index tools first (graph → code-metadata → `grep=true` retry); `Grep` / `Glob` only as a justified last resort on 1C project source.
+**Search discipline:** Follow `content/rules/mcp-first-search.md` — MCP project-index tools first (`edt-mcp` model-based search/navigation → `search_in_code` literal/regex retry); `Grep` / `Glob` only as a justified last resort on 1C project source.
 
-**Key tools for metadata work (1c-code-metadata-mcp):**
-- **metadatasearch** — verify metadata object existence and structure
+**Key tools for metadata work (`edt-mcp`; see `docs/edt-mcp.md` for the full catalog):**
+- **get_metadata_objects** — verify metadata object existence and structure
 - **get_metadata_details** — get full object structure: attributes with types, tabular parts, synonyms
-- **search_forms** — find similar existing forms by object/form name
-- **inspect_form_layout** — get full form structure: elements, bindings, commands, events
-- **get_xsd_schema** — get XSD schema for metadata type before generating XML
-- **verify_xml** — validate generated XML against XSD after generation
-- **codesearch** — find existing module code patterns
-- **search_function** — find BSL procedures/functions by name
-- **graph_dependencies** — analyze object dependencies before modifications
+- **get_objects_by_tags** / **get_tags** — find similar existing forms by object/form name
+- **get_form_layout_snapshot** — get full form structure: elements, bindings, commands, events
+- **revalidate_objects** — validate metadata/form XML shape before and after generation (no separate XSD validator — see `docs/edt-mcp.md → Coverage gaps`)
+- **search_in_code** — find existing module code patterns
+- **get_module_structure** — find BSL procedures/functions by name
+- **find_references** — analyze object dependencies before modifications
 
 **Other tools:**
 - **docsearch** — verify platform functions and XML element names

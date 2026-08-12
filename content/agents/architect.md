@@ -38,7 +38,7 @@ Extract existing patterns, conventions, and architectural decisions:
 **Use MCP Tools:** See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1c-tools` skill (`content/skills/mcp-1c-tools/SKILL.md`) for descriptions. Follow the `powershell-windows` skill for shell commands.
 
 **Development standards:** Follow `content/rules/dev-standards-env.md` (project parameters), `content/rules/dev-standards-code-style.md` (naming and documentation), and `content/rules/dev-standards-architecture.md` (architecture patterns, extensions, platform standards).
-Key tools: **codesearch**, **metadatasearch**, **get_metadata_details**, **graph_dependencies**, **get_method_call_hierarchy**, **templatesearch**
+Key tools: **search_in_code**, **get_metadata_objects**, **get_metadata_details**, **find_references**, **get_method_call_hierarchy**, **templatesearch**
 
 **Search discipline:** Follow `content/rules/mcp-first-search.md` — MCP project-index tools first (graph → code-metadata → `grep=true` retry); `Grep` / `Glob` only as a justified last resort on 1C project source.
 

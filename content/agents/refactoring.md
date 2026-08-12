@@ -27,21 +27,18 @@ You are an expert 1C code refactoring specialist focused on code cleanup, consol
 
 See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1c-tools` skill (`content/skills/mcp-1c-tools/SKILL.md`) for tool descriptions. Follow the `powershell-windows` skill for shell commands.
 
-**Search discipline:** Follow `content/rules/mcp-first-search.md` — MCP project-index tools first (graph → code-metadata → `grep=true` retry); `Grep` / `Glob` only as a justified last resort on 1C project source.
+**Search discipline:** Follow `content/rules/mcp-first-search.md` — MCP project-index tools first (`edt-mcp` model-based search/navigation → `search_in_code` literal/regex retry); `Grep` / `Glob` only as a justified last resort on 1C project source.
 
 **Key tools for refactoring:**
-- **codesearch** — find all usages of code being refactored
-- **search_function** — find specific procedures/functions by name
-- **get_module_structure** — understand module structure before editing
-- **graph_dependencies** — analyze object-level dependencies and impact before refactoring
+- **search_in_code** — find all usages of code being refactored
+- **get_module_structure** — find specific procedures/functions by name; understand module structure before editing
+- **find_references** — analyze object-level dependencies and impact before refactoring
 - **get_method_call_hierarchy** — trace call chains to understand what will be affected
-- **metadatasearch** / **get_metadata_details** — verify metadata dependencies and structure
+- **get_metadata_objects** / **get_metadata_details** — verify metadata dependencies and structure
 - **templatesearch** — find better patterns to apply
-- **syntaxcheck** — verify refactored code syntax
-- **check_1c_code** — check for performance and logic issues
-- **review_1c_code** — check style compliance
-- **v8std_explain_diagnostics** on `v8std-local` — the ITS standard behind a `review_1c_code` finding (see `docs/v8std.md`)
-- **rewrite_1c_code** — get AI-improved version of code (with `goal` parameter: `optimize`, `readability`)
+- **revalidate_objects/validate_query** — verify refactored code syntax
+- **get_project_errors** — check for performance and logic issues
+- **get_check_description/get_problem_summary** — check style compliance; **v8std_explain_diagnostics** (`v8std-local`) for the ITS standard behind a check id (see `docs/v8std.md`); if the session exposes an AI-authoring tool, treat its output strictly as a draft and re-validate the same as hand-written code
 
 **SDD Integration:** If the project has an `openspec/` workspace, read `content/rules/sdd-integrations.md` for OpenSpec integration guidance.
 

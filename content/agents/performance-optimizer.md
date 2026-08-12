@@ -23,19 +23,20 @@ You are an expert 1C performance optimization specialist focused on identifying 
 
 See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1c-tools` skill (`content/skills/mcp-1c-tools/SKILL.md`) for tool descriptions. Follow the `powershell-windows` skill for shell commands.
 
-**Search discipline:** Follow `content/rules/mcp-first-search.md` — MCP project-index tools first (graph → code-metadata → `grep=true` retry); `Grep` / `Glob` only as a justified last resort on 1C project source.
+**Search discipline:** Follow `content/rules/mcp-first-search.md` — MCP project-index tools first (`edt-mcp` model-based search/navigation → `search_in_code` literal/regex retry); `Grep` / `Glob` only as a justified last resort on 1C project source.
 
 **Key tools for optimization:**
-- **codesearch** — find slow patterns in codebase
+- **search_in_code** — find slow patterns in codebase
 - **get_method_call_hierarchy** — identify hot call paths and trace performance-critical chains
-- **graph_dependencies** — find objects causing cascading performance issues
-- **metadatasearch** / **get_metadata_details** — check indexes and metadata structure
-- **search_function** — find specific procedures for targeted optimization
-- **check_1c_code** — analyze code for performance and logic issues
-- **rewrite_1c_code** — get AI-optimized version of code (with `goal: optimize`; output is a draft — re-validate)
-- **v8std_search** on `v8std-local` — ITS performance-standard clauses by topic ("оптимизация запроса", "минимизация серверных вызовов"); see `docs/v8std.md`. Use **its_help** → **fetch_its** instead if the project runs `1c-code-check-mcp`.
-- **syntaxcheck** — verify syntax after changes
-- **review_1c_code** — style and ITS-standards compliance of the changed code
+- **find_references** — find objects causing cascading performance issues
+- **get_metadata_objects** / **get_metadata_details** — check indexes and metadata structure
+- **get_module_structure** — find specific procedures for targeted optimization
+- **get_project_errors** — analyze code for performance and logic issues (if the session exposes an AI-authoring tool that rewrites code, treat its output strictly as a draft and re-validate the same as hand-written code)
+- **revalidate_objects/validate_query** — verify syntax after changes
+- **get_check_description/get_problem_summary** — style compliance of the changed code
+- **v8std_search** (`v8std-local`) — ITS performance-standard clauses by topic ("оптимизация запроса", "минимизация серверных вызовов"); see `docs/v8std.md`. Use **its_help** → **fetch_its** instead if the project runs `1c-code-check-mcp`.
+
+After every edit run the full chain in order — `revalidate_objects/validate_query` → `get_project_errors` → `get_check_description/get_problem_summary` — within the budget from `AGENTS.md → MCP Tool Calling → B.1`; a blocking defect requires a clean confirming run on the changed state. If a validator is not exposed in the session — graceful degradation per `content/rules/verification-gates.md`; record the skip in the report.
 
 After every edit run the full chain in order — `syntaxcheck` → `check_1c_code` → `review_1c_code` — within the budget from `AGENTS.md → MCP Tool Calling → B.1`; a blocking defect requires a clean confirming run on the changed state. If a validator is not exposed in the session — graceful degradation per `content/rules/verification-gates.md`; record the skip in the report.
 

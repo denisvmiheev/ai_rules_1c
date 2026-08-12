@@ -79,7 +79,9 @@ When adding metadata objects — also update `Configuration.xml` (`<childObjects
 
 Whenever editing metadata XML by hand, after the change run:
 
-- `verify_xml` from `1c-code-metadata-mcp` against the appropriate XSD (`get_xsd_schema` first if unsure of the type).
-- Then a sanity load via `1c-metadata-manage/tools/1c-meta-validate/scripts/meta-validate.ps1`.
+- `revalidate_objects` (`edt-mcp`) on the touched FQNs — it refreshes the model from disk, so it picks up files edited by hand.
+- `get_project_errors` (`edt-mcp`, scoped with `objects=[...]`) as the confirming pass. There is **no** XSD / raw-XML validator on `edt-mcp` — EDT validation of the loaded model is the check.
 
 This catches structural issues (missing required elements, wrong type names, broken references) before they reach the platform.
+
+> **Classic docker distribution instead of `edt-mcp`.** If the project runs `1c-code-metadata-mcp` rather than `edt-mcp`, use `verify_xml` against the appropriate XSD (`get_xsd_schema` first if unsure of the type), then a sanity load via `1c-metadata-manage/tools/1c-meta-validate/scripts/meta-validate.ps1` — that script expects a classic Designer-export directory (`Configuration.xml` + type folders) and does not apply to an EDT-project (`.mdo`/`.bsl`) layout.

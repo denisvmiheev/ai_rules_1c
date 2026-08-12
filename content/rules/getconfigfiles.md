@@ -22,7 +22,7 @@ Ask-policy (canon — `dev-standards-env.md`): only `INFOBASE_PATH` and `PLATFOR
 
 ## Steps
 
-**Step 1.** Compose the list of objects to export in `repoobjects.txt` (one full metadata-object name per line, e.g. `Справочник.Контрагенты`). Build the list via `metadatasearch` or `search_metadata` (see `content/skills/mcp-1c-tools/SKILL.md`).
+**Step 1.** Compose the list of objects to export in `repoobjects.txt` (one full metadata-object name per line, e.g. `Справочник.Контрагенты`). Build the list via `get_metadata_objects` (`edt-mcp`) or the classic distribution's `metadatasearch`/`search_metadata` (see `content/skills/mcp-1c-tools/SKILL.md`).
 
 **Step 2.** Choose the export tool:
 

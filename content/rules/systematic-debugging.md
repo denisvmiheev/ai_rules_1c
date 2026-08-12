@@ -61,7 +61,7 @@ Tools to use:
 - **`ЖурналРегистрации`** filter by date range / user / event / metadata to find the failing call. For high-volume errors prefer `ВыгрузитьЖурналРегистрации` to a `ТаблицаЗначений` for offline analysis.
 - **Technological log** (`logcfg.xml`) for platform-level events (DBMS errors, deadlocks, lock conflicts, timeouts) when the application log is not enough.
 - **`ОбработкаПроведения`** + the `Replay` mechanism for documents — re-post the failing document under the debugger.
-- **MCP**: `codesearch` / `search_code` to find the exact procedure that printed the error message, `search_function` to locate it by name, `get_module_structure` to get its surroundings.
+- **MCP**: `search_in_code` to find the exact procedure that printed the error message, `get_module_structure` to locate it by name and see its surroundings.
 
 If you cannot reproduce, **stop**. Ask the user for missing input data, screenshots, the exact step sequence, or a copy of the infobase. Do not guess.
 
@@ -77,11 +77,10 @@ For each hypothesis state:
 
 Tools to use:
 
-- **`trace_call_chain(routine_name=..., object_name=..., direction="callers")`** to map all call paths that reach the failing routine; use `direction="callees"` to map routines it calls.
-- **`trace_impact(object_name=...)`** only for object-level dependencies of the owning module / metadata object (registers, referenced objects, movements), not as a routine-call query.
-- **`get_method_call_hierarchy`** as a fallback when the graph server is unavailable.
+- **`get_method_call_hierarchy`** to map all call paths that reach the failing routine, and the routines it calls.
+- **`find_references`** for object-level dependencies of the owning module / metadata object (registers, referenced objects, movements), not as a routine-call query.
 - **`docinfo`** to verify that a built-in function actually does what you assume — many bugs are platform-version-dependent (`ТекущаяДатаСеанса` vs `ТекущаяДата`, `НайтиПоНаименованию` collation, `ПолучитьСтруктуруХраненияБазыДанных` differences across versions).
-- **`its_help` → `fetch_its`** to verify the documented behaviour of the platform mechanism you suspect.
+- **`v8std_search`** on `v8std-local` to verify the documented behaviour of the platform mechanism you suspect (or `its_help` → `fetch_its` on `1c-code-check-mcp` if that server is used instead).
 - **`ask_1c_ai`** as a hint generator (treat as a draft — do not let an AI hint replace the falsifying experiment).
 
 Produce at least 2 hypotheses. In the full loop a single hypothesis is anchoring bias — challenge it with a competing one even when it feels right (a bug that genuinely admits only one explanation belongs on the fast path, not here).

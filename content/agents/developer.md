@@ -55,18 +55,18 @@ Key rules to always remember:
 
 ## Development Workflow
 
-1. Study the task and context. **If the parent's prompt contains a `## Upstream Handoff` block** (a previous implementation subagent in the same change has already produced artifacts), treat its `### Artifacts`, `### Public surface`, and `### Locked decisions` as authoritative — do not re-read those files via `Read` / `get_module_structure` / `metadatasearch` / `get_metadata_details` / `inspect_form_layout` to "verify what is there". Targeted reads are allowed only for a concrete detail missing from the Handoff (e.g. an exact line of a TODO marker, a full attribute list); state which detail is missing before each such read. Full rules: `content/rules/subagent-pipeline.md → Stage 3 — Handoff between implementation subagents`.
+1. Study the task and context. **If the parent's prompt contains a `## Upstream Handoff` block** (a previous implementation subagent in the same change has already produced artifacts), treat its `### Artifacts`, `### Public surface`, and `### Locked decisions` as authoritative — do not re-read those files via `Read` / `get_module_structure` / `get_metadata_objects` / `get_metadata_details` / `get_form_layout_snapshot` to "verify what is there". Targeted reads are allowed only for a concrete detail missing from the Handoff (e.g. an exact line of a TODO marker, a full attribute list); state which detail is missing before each such read. Full rules: `content/rules/subagent-pipeline.md → Stage 3 — Handoff between implementation subagents`.
 2. Search for code templates via **`templatesearch`** — `A.8` (query pre-flight) then **`A.9`**: if a matching template is returned, **start from it**; adapt only required details; do not rewrite from scratch
-3. Check existing patterns via `codesearch`; use `search_function` to find specific procedures/functions
+3. Check existing patterns via `search_in_code`; use `get_module_structure` to find specific procedures/functions
 4. Use `get_module_structure` to understand the module you're about to edit (skip for files already inventoried in `## Upstream Handoff`)
 5. If unclear — ask the user for clarification
 6. Design solution considering DRY, and project rules
-7. Verify metadata via `metadatasearch` and `get_metadata_details` for attribute types
-8. Use `bsl_scope_members` to discover available methods/properties for the context
-9. Use `docsearch` and `ssl_search` as needed; for specialized capabilities the platform-capability check is mandatory **before** custom design — `AGENTS.md → A.7`; **when a mechanism is found — use it**, do not invent a parallel one (`1C-docs-mcp.md → Using a found platform mechanism`)
+7. Verify metadata via `get_metadata_objects` and `get_metadata_details` for attribute types
+8. Use `get_content_assist` to discover available methods/properties for the context
+9. Use `docsearch` and `ssl_search` as needed; for specialized capabilities the platform-capability check is mandatory **before** custom design — `AGENTS.md → A.7`; **when a mechanism is found — use it**, do not invent a parallel one (`1c-platform-mcp.md → Using a found platform mechanism`)
 10. Write code strictly following the rules
-11. Check code via `syntaxcheck`, `check_1c_code` and `review_1c_code` — within the verification budget from `AGENTS.md → MCP Tool Calling → B.1`
-12. Before refactoring, use `graph_dependencies` and `get_method_call_hierarchy` to understand impact
+11. Check code via `revalidate_objects`/`validate_query`, `get_project_errors`, and `get_check_description`/`get_problem_summary` — within the verification budget from `AGENTS.md → MCP Tool Calling → B.1`
+12. Before refactoring, use `find_references` and `get_method_call_hierarchy` to understand impact
 13. Perform internal code review
 14. Improve code if necessary
 15. Present the result using the report structure below
@@ -77,10 +77,10 @@ Before reporting, verify all of the following. For non-trivial changes also appl
 
 - [ ] Every assigned task / plan item is implemented; nothing was silently skipped or replaced
 - [ ] No file outside the assigned scope was edited; no "while we're here" changes
-- [ ] `syntaxcheck` passes on every touched module; `check_1c_code` / `review_1c_code` were run within the budget and substantive findings are fixed
+- [ ] `revalidate_objects`/`validate_query` passes on every touched module; `get_project_errors` / `get_check_description`/`get_problem_summary` were run within the budget and substantive findings are fixed
 - [ ] Imports, variables, and procedures that **your** changes made unused are removed (pre-existing dead code untouched)
 - [ ] Module regions, headers, and project code style (`dev-standards-code-style.md`) are preserved
-- [ ] Impact on callers / metadata / forms was considered when the change is more than a local edit (`trace_call_chain` for routine callers; `trace_impact` / `graph_dependencies` for object dependencies)
+- [ ] Impact on callers / metadata / forms was considered when the change is more than a local edit (`get_method_call_hierarchy` for routine callers; `find_references` for object dependencies)
 
 If a criterion cannot be met, say so explicitly in the report — do not present a partial result as complete.
 

@@ -26,9 +26,9 @@ See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1
 **Search discipline:** Follow `content/rules/mcp-first-search.md` — MCP project-index tools first (graph → code-metadata → `grep=true` retry); `Grep` / `Glob` are not in this agent's toolset by design (see frontmatter) — request a search via the parent or `1c-explorer` if needed.
 
 **Key tools for architecture review:**
-- **codesearch** — find existing patterns in codebase
-- **metadatasearch** / **get_metadata_details** — verify metadata structure and attribute types
-- **graph_dependencies** — map relationships between configuration objects
+- **search_in_code** — find existing patterns in codebase
+- **get_metadata_objects** / **get_metadata_details** — verify metadata structure and attribute types
+- **find_references** — map relationships between configuration objects
 - **get_method_call_hierarchy** — understand code coupling and call chains
 - **templatesearch** — compare against established templates
 

@@ -106,11 +106,15 @@ Pass criterion: OpenSpec exists, and `openspec/project.md` is present and meanin
 
 Check MCP at two levels:
 
-1. **Current session tools** — verify that expected tools are visible in the current agent tool schema when the server is configured:
-   - `syntaxcheck` for `1c-syntax-checker-mcp`;
-   - `templatesearch`, `remember`, `recall` for `1c-templates-mcp`;
+1. **Current session tools** — verify that expected tools are visible in the current agent tool schema when the server is configured. This fork's default catalog:
+   - `templatesearch`, `remember`, `recall` for `1c-templates-fastcode`;
    - `ssl_search` for `1c-ssl-mcp`;
-   - `docinfo`, `docsearch` for `1C-docs-mcp`;
+   - `docinfo`, `docsearch` for `1c-platform-mcp`;
+   - `v8std_search`, `v8std_explain_diagnostics`, `v8std_get_page` for `v8std-local`;
+   - `get_metadata_objects`, `search_in_code`, `get_module_structure`, `revalidate_objects`, `get_project_errors` for `edt-mcp` (see `content/skills/mcp-1c-tools/docs/edt-mcp.md` for the full catalog).
+
+   A project running the classic docker distribution instead of `edt-mcp` checks its own set:
+   - `syntaxcheck` for `1c-syntax-checker-mcp`;
    - `metadatasearch`, `codesearch`, `search_function`, `get_module_structure` for `1c-code-metadata-mcp`;
    - `search_metadata`, `get_object_dossier`, `trace_impact`, `trace_call_chain` for `1c-graph-metadata-mcp`;
    - `check_1c_code`, `review_1c_code`, `its_help`, `fetch_its` for `1c-code-check-mcp`.

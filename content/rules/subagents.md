@@ -151,8 +151,8 @@ Return: 3–7 best examples with paths and qualified names, which pattern to reu
 ### metadata-scout — inspect an object / form before a change (`1c-explorer`, light-tier candidate)
 
 ```text
-Read-only metadata/form scout. Inspect <metadata object / form / layout> via get_object_dossier /
-get_metadata_details / inspect_form_layout; confirm against the source XML/BSL when in doubt.
+Read-only metadata/form scout. Inspect <metadata object / form / layout> via get_metadata_details /
+get_form_layout_snapshot; confirm against the source XML/BSL when in doubt.
 Do not edit files. Return: object structure, form elements / commands / events, related modules,
 validation risks, and a suggested write scope for the implementation step.
 ```

@@ -56,17 +56,17 @@ Evaluate significant issues:
 
 See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1c-tools` skill (`content/skills/mcp-1c-tools/SKILL.md`) for tool descriptions.
 
-**Search discipline:** Follow `content/rules/mcp-first-search.md` — MCP project-index tools first (graph → code-metadata → `grep=true` retry); `Grep` / `Glob` are not in this agent's toolset by design (see frontmatter) — request a search via the parent or `1c-explorer` if needed.
+**Search discipline:** Follow `content/rules/mcp-first-search.md` — MCP project-index tools first (`edt-mcp` model-based search/navigation → `search_in_code` literal/regex retry); `Grep` / `Glob` are not in this agent's toolset by design (see frontmatter) — request a search via the parent or `1c-explorer` if needed.
 
 **Key tools for review:**
 - **docsearch** — verify method/property existence
-- **metadatasearch** / **get_metadata_details** — verify correct metadata usage and attribute types
-- **codesearch** — verify compliance with existing patterns
-- **graph_dependencies** — analyze impact of the code being reviewed
+- **get_metadata_objects** / **get_metadata_details** — verify correct metadata usage and attribute types
+- **search_in_code** — verify compliance with existing patterns
+- **find_references** — analyze impact of the code being reviewed
 - **get_method_call_hierarchy** — trace call chains, find affected callers
-- **check_1c_code** — analyze code for syntax, logic and performance issues
-- **review_1c_code** — check style, ITS standards, naming, structure compliance
-- **v8std_explain_diagnostics** / **v8std_search** on `v8std-local` — resolve a finding to its ITS standard clause; **v8std_get_page** for the full text (see `docs/v8std.md`). Use **its_help** → **fetch_its** instead if the project runs `1c-code-check-mcp`.
+- **get_project_errors** — analyze code for syntax, logic and performance issues
+- **get_check_description/get_problem_summary** — check style, naming, structure compliance
+- **v8std_explain_diagnostics** (`v8std-local`) — resolve a finding's check id (ACC/АПК, BSLLS, EDT, v8-code-style) to its ITS standard clause; **v8std_search** for a topic without a diagnostic id yet (see `docs/v8std.md`)
 
 **SDD Integration:** If the project has an `openspec/` workspace, read `content/rules/sdd-integrations.md` for OpenSpec integration guidance.
 

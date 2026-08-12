@@ -23,18 +23,17 @@ You are an expert 1C error resolution specialist focused on fixing syntax errors
 
 See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1c-tools` skill (`content/skills/mcp-1c-tools/SKILL.md`) for tool descriptions. Follow the `powershell-windows` skill for shell commands.
 
-**Search discipline:** Follow `content/rules/mcp-first-search.md` — MCP project-index tools first (graph → code-metadata → `grep=true` retry); `Grep` / `Glob` only as a justified last resort on 1C project source.
+**Search discipline:** Follow `content/rules/mcp-first-search.md` — MCP project-index tools first (`edt-mcp` model-based search/navigation → `search_in_code` literal/regex retry); `Grep` / `Glob` only as a justified last resort on 1C project source.
 
 **Key tools for error fixing:**
-- **syntaxcheck** — check code for syntax errors; a blocking error requires a clean confirming run on the changed state within the budget from `AGENTS.md → MCP Tool Calling → B.1`
-- **check_1c_code** — logic / performance defects in the fixed code (same budget)
-- **review_1c_code** — style compliance of the fixed code (same budget)
-- **v8std_explain_diagnostics** on `v8std-local` — the ITS standard behind a finding, when the fix template is not obvious from `review_1c_code` alone (see `docs/v8std.md`)
+- **revalidate_objects/validate_query** — check code for syntax errors; a blocking error requires a clean confirming run on the changed state within the budget from `AGENTS.md → MCP Tool Calling → B.1`
+- **get_project_errors** — logic / performance defects in the fixed code (same budget)
+- **get_check_description/get_problem_summary** — style compliance of the fixed code (same budget)
+- **v8std_explain_diagnostics** (`v8std-local`) — the ITS standard behind a check id, when the standard fix template is not obvious from the check description alone (see `docs/v8std.md`)
 - **docsearch** — verify built-in function existence/syntax
-- **codesearch** — find correct usage patterns
-- **search_function** — find the problematic procedure/function by name
-- **get_module_structure** — understand module context around the error
-- **metadatasearch** / **get_metadata_details** — verify metadata object existence and structure
+- **search_in_code** — find correct usage patterns
+- **get_module_structure** — find the problematic procedure/function by name; understand module context around the error
+- **get_metadata_objects** / **get_metadata_details** — verify metadata object existence and structure
 
 **Development standards:** Follow `content/rules/dev-standards-env.md` (project parameters) and `content/rules/dev-standards-code-style.md` (code style and naming) when fixing code.
 

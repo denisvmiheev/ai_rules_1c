@@ -8,7 +8,7 @@ category: forms
 
 This file owns the **rules**, not the MCP sequence. The pre-edit and post-edit MCP playbooks live in:
 
-- `tooling-playbooks.md → Form Analysis and Generation` — full ordered list of MCP calls (`search_forms` → `inspect_form_layout` → `metadatasearch` → `get_xsd_schema` → write/modify XML → `verify_xml` → compile via the `1c-metadata-manage` skill).
+- `tooling-playbooks.md → Form Analysis and Generation` — full ordered list of MCP calls (`get_objects_by_tags`/`get_tags` → `get_form_layout_snapshot` → `get_metadata_objects` → `create_metadata` / `modify_metadata` on form FQNs → `revalidate_objects` → `get_project_errors`).
 
 Do not duplicate that sequence here.
 
