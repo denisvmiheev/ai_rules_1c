@@ -8,7 +8,9 @@
 
 This is a personal fork of [`comol/ai_rules_1c`](https://github.com/comol/ai_rules_1c). Default MCP catalog (`content/mcp-servers.json`) and the core discovery/verification/subagent tooling are migrated to `edt-mcp` (1C:EDT MCP plugin) plus `v8std-local` (ITS standards) instead of upstream's classic docker-distribution servers — see `content/skills/mcp-1c-tools/docs/edt-mcp.md` for the mapping. `/updaterules` and `install.ps1`'s default `-Source` point at **this** repository, not upstream — projects installed from here stay on this fork's architecture across updates.
 
-To pull upstream improvements into this fork:
+To pull upstream improvements into this fork, run **`/updatefromupstream`** in any project session (`content/commands/updatefromupstream.md`) — it fetches, summarizes what changed, merges, asks before resolving anything beyond a mechanical rename conflict, pushes on confirmation, and offers to run `/updaterules` in the current project afterward.
+
+Equivalent by hand:
 
 ```bash
 git remote add upstream https://github.com/comol/ai_rules_1c.git   # once

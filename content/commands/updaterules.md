@@ -4,7 +4,7 @@ description: Update the 1c-rules ruleset from GitHub (https://github.com/denisvm
 
 # /updaterules — update 1c-rules
 
-Source: `https://github.com/denisvmiheev/ai_rules_1c` (fork of `comol/ai_rules_1c` with edt-mcp / v8std-local as the default MCP catalog — see `README.md → Relationship to upstream`).
+Source: `https://github.com/denisvmiheev/ai_rules_1c` (fork of `comol/ai_rules_1c` with edt-mcp / v8std-local as the default MCP catalog — see `README.md → Relationship to upstream`). To pull upstream changes into the fork itself before running this, use `/updatefromupstream` instead.
 
 Action: update managed files in the current installation to the latest repository version (on-demand rules, subagent descriptions, slash commands, SKILL packages, MCP config, OpenSpec bundle, rendered `AGENTS.md`). Preserve:
 
