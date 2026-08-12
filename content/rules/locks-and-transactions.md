@@ -18,7 +18,7 @@ Set the configuration property **«Режим управления блокир�
 - Managed mode is the only mode where lock granularity is under the developer's control (per-table / per-key, not per-row-page).
 - Modern БСП subsystems assume managed mode.
 
-Migrating an existing project from automatic to managed is a separate, multi-step task — out of scope here; use ITS "Перевод конфигурации на управляемый режим блокировки".
+Migrating an existing project from automatic to managed is a separate, multi-step task — out of scope here; use ITS "Перевод конфигурации на управляемый режим блокировки" — [std460](https://v8std.ru/std/460/) "Использование управляемого режима блокировки" (`v8std-local`, see `.claude/skills/mcp-1c-tools/docs/v8std.md`).
 
 ## 2. Transaction boundaries
 

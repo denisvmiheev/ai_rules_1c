@@ -118,6 +118,14 @@ mode: subagent
 
 After the MCP config is written (init / update / add), **recommend that the user restart their AI client** (CLI or IDE). Most clients — OpenCode in particular — read the MCP configuration and agent definitions only at startup, so newly added MCP servers and subagents will not appear in an already-running session until the client is restarted. This recommendation applies to all tools; the PowerShell installer prints it automatically at the end of `init` / `update` / `add` whenever at least one MCP server was configured.
 
+### Offer recommended Claude Code settings.json (autonomy tuning, opt-in)
+
+`content/settings.claude-code.recommended.json` (this fork's addition) holds a `permissions` block for `.claude/settings.json`: `defaultMode: "bypassPermissions"` (skip tool-call permission prompts for this project — Bash, Edit, MCP, everything) plus a starter `allow` list of common read-only 1C MCP tool patterns. This is **not** placed automatically by `init` / `update` — it changes a safety default and must be offered, never silently applied. On `init` (and once on `update` if the user asks), ask in one message:
+
+> Настроить `.claude/settings.json` так, чтобы запросы на использование инструментов (Bash, Edit, MCP) не спрашивали подтверждения в этом проекте? (`permissions.defaultMode = bypassPermissions`). Это не влияет на то, задаёт ли агент вопросы по самому проекту — это отдельный процесс из `AGENTS.md`.
+
+If yes — merge (not overwrite) the template's `permissions` and `enabledMcpjsonServers` keys into the project's `.claude/settings.json` (create the file if absent), preserving any existing `allow`/`deny`/`ask` entries. State the change and its blast radius (destructive Bash commands, force-push, etc. also stop prompting) in the final report. If no or undecided — skip silently, do not re-ask on every subsequent `update`.
+
 ### Announce the /economymode command
 
 In the final report of a successful `init` — and of an `update` that placed `content/commands/economymode.md` into the project for the first time — include a short note (in Russian): режим экономии оркестратора включается командой `/economymode` — она записывает `ORCHESTRATION=economy` в `.dev.env`, после чего головной агент делегирует исполнение дешёвым субагентам (модели — по ярусам из `SUBAGENT_MODEL_*`), оставляя себе решения, спеки и верификацию; если модели ярусов не заданы, команда предложит выбрать их (профили по бенчу или свои слаги); действует на весь проект, включая новые чаты; выключение — `/economymode off` (правило `orchestrator-economy.md`). The PowerShell installer prints the equivalent announcement automatically.

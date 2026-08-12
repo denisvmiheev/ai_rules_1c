@@ -28,7 +28,8 @@ See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1
 **Key tools for error fixing:**
 - **syntaxcheck** — check code for syntax errors; a blocking error requires a clean confirming run on the changed state within the budget from `AGENTS.md → MCP Tool Calling → B.1`
 - **check_1c_code** — logic / performance defects in the fixed code (same budget)
-- **review_1c_code** — style and ITS-standards compliance of the fixed code (same budget)
+- **review_1c_code** — style compliance of the fixed code (same budget)
+- **v8std_explain_diagnostics** on `v8std-local` — the ITS standard behind a finding, when the fix template is not obvious from `review_1c_code` alone (see `docs/v8std.md`)
 - **docsearch** — verify built-in function existence/syntax
 - **codesearch** — find correct usage patterns
 - **search_function** — find the problematic procedure/function by name

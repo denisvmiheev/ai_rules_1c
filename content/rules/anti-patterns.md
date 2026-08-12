@@ -37,7 +37,7 @@ category: quality
 
 **Impact:** Loads entire object from database
 **Severity:** CRITICAL
-**Note:** Project default is a hard ban outside trivial single-call handlers. **[Project rule — stricter than ITS standard]** — ITS allows occasional dot-notation in non-hot code; the project default is to use dedicated БСП methods regardless. See `dev-standards-architecture.md §4 → "Data Access — Reference Attribute Access"`.
+**Note:** Project default is a hard ban outside trivial single-call handlers. **[Project rule — stricter than ITS standard — [std496](https://v8std.ru/std/496/) "Чтение отдельных реквизитов объекта из базы данных"]** — ITS allows occasional dot-notation in non-hot code; the project default is to use dedicated БСП methods regardless. See `dev-standards-architecture.md §4 → "Data Access — Reference Attribute Access"`.
 
 ```bsl
 // ❌ CRITICAL: Full object load for each attribute

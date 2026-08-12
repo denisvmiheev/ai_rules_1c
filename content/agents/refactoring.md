@@ -39,7 +39,8 @@ See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1
 - **templatesearch** — find better patterns to apply
 - **syntaxcheck** — verify refactored code syntax
 - **check_1c_code** — check for performance and logic issues
-- **review_1c_code** — check style and ITS standards compliance
+- **review_1c_code** — check style compliance
+- **v8std_explain_diagnostics** on `v8std-local` — the ITS standard behind a `review_1c_code` finding (see `docs/v8std.md`)
 - **rewrite_1c_code** — get AI-improved version of code (with `goal` parameter: `optimize`, `readability`)
 
 **SDD Integration:** If the project has an `openspec/` workspace, read `content/rules/sdd-integrations.md` for OpenSpec integration guidance.

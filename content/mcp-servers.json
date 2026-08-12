@@ -1,23 +1,16 @@
 {
+  "_fork_note": "denisvmiheev/ai_rules_1c fork: default server set matches an EDT-based workflow (edt-mcp) plus v8std-local for ITS standards, instead of upstream's classic docker distribution (1c-code-metadata-mcp, 1c-syntax-checker-mcp, 1c-graph-metadata-mcp, 1c-code-check-mcp, 1c-data-mcp — dropped from this catalog; restore from git history if a project needs the classic distribution instead). See content/skills/mcp-1c-tools/docs/edt-mcp.md for the capability mapping. edt-mcp itself needs no license key or docker container — it ships with 1C:EDT (https://github.com/DitriXNew/EDT-MCP) and just needs EDT running with the plugin enabled.",
   "servers": [
     {
-      "id": "1c-code-metadata-mcp",
-      "description": "1C metadata search, code navigation, forms inspection, XSD schemas and validation",
+      "id": "edt-mcp",
+      "description": "1C:EDT MCP plugin: metadata discovery & typed mutation, BSL read/write & navigation, call hierarchy / impact analysis, EDT validation markers, forms rendering, debug & YAXUnit & profiling, infobases / DB update, event log, git branches, translation",
       "transport": "http",
-      "url": "http://localhost:8000/mcp",
-      "connectionId": "1c_metadata_service_001",
+      "url": "http://localhost:8766/mcp",
+      "connectionId": "edt_mcp_001",
       "required": false
     },
     {
-      "id": "1c-syntax-checker-mcp",
-      "description": "BSL syntax validation via BSL Language Server",
-      "transport": "http",
-      "url": "http://localhost:8002/mcp",
-      "connectionId": "1c_lsp_service_001",
-      "required": false
-    },
-    {
-      "id": "1C-docs-mcp",
+      "id": "1c-platform-mcp",
       "description": "1C platform documentation search (docsearch, docinfo)",
       "transport": "http",
       "url": "http://localhost:8003/mcp",
@@ -25,27 +18,11 @@
       "required": false
     },
     {
-      "id": "1c-templates-mcp",
-      "description": "Code templates library and implementation examples search",
+      "id": "1c-templates-fastcode",
+      "description": "Code templates library, implementation examples search, and project vector memory (remember/recall)",
       "transport": "http",
       "url": "http://localhost:8004/mcp",
       "connectionId": "1c_templates_service_001",
-      "required": false
-    },
-    {
-      "id": "1c-graph-metadata-mcp",
-      "description": "Graph-based metadata queries and impact analysis (Neo4j / Cypher)",
-      "transport": "http",
-      "url": "http://localhost:8006/mcp",
-      "connectionId": "1c_graph_metadata_service_001",
-      "required": false
-    },
-    {
-      "id": "1c-code-check-mcp",
-      "description": "1C code review and quality checking (1С:Напарник) — check_1c_code, review_1c_code, ITS docs",
-      "transport": "http",
-      "url": "http://localhost:8007/mcp",
-      "connectionId": "1c_code_check_service_001",
       "required": false
     },
     {
@@ -57,11 +34,11 @@
       "required": false
     },
     {
-      "id": "1c-data-mcp",
-      "description": "1C data management and analysis (HTTP service published on the infobase; URL is derived from INFOBASE_PUBLISH_URL in .dev.env by the installer). The endpoint MUST be reachable without a password — configure anonymous access in default.vrd (technical user with empty password), otherwise the MCP client receives HTTP 401/403 and the tools do not appear.",
+      "id": "v8std-local",
+      "description": "Read-only v8std.ru mirror: ITS 1C development standards search, and mapping between analyzer diagnostics (ACC/АПК, BSLLS, EDT, v8-code-style) and the standard clauses they enforce",
       "transport": "http",
-      "url": "{INFOBASE_PUBLISH_URL}/hs/mcp",
-      "connectionId": "1c_data_mcp_001",
+      "url": "http://localhost:8765/mcp",
+      "connectionId": "v8std_local_001",
       "required": false
     }
   ]

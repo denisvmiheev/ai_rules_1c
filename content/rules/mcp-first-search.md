@@ -60,10 +60,11 @@ Full-file `Read` is **normal work** — no MCP attempt, no justification note �
 | "Get oriented" in an unfamiliar configuration | `search_metadata` (list by category) / `business_search` | `metadatasearch(names_only=true)` — **not** `Glob **/*.bsl` |
 | Module structure overview | `get_module_structure(module_path)` | `inspect_form_layout` for forms |
 | Form layout | `inspect_form_layout(object_name)` | `search_forms` |
-| Canonical pattern / template | **`templatesearch` only** — task description verbatim; pre-flight `1c-templates-mcp.md → Query formulation (templatesearch only)` (`AGENTS.md → A.8`) (+ `ssl_search` for БСП) | — |
+| Canonical pattern / template | **`templatesearch` only** — task description verbatim; pre-flight `1c-templates-fastcode.md → Query formulation (templatesearch only)` (`AGENTS.md → A.8`) (+ `ssl_search` for БСП) | — |
 | Platform API verification | `docinfo(name)` or `docsearch(query)` | `helpsearch` |
 | Does the platform ship a mechanism for X (СЛАУ, crypto, data analysis, bus, bots, …)? | `docsearch(capability description)` → `docinfo` per found name (`AGENTS.md → A.7`) | `ssl_search` for a БСП-level solution |
-| ITS standards | `its_help(query)` → `fetch_its(id)` for **every** relevant doc | — |
+| ITS standards (topic / prose) | `v8std_search(query)` on `v8std-local` | `v8std_get_page` on a returned id for the full text |
+| ITS standard behind a diagnostic (ACC/АПК, BSLLS, EDT, v8-code-style) | `v8std_explain_diagnostics(codes)` on `v8std-local` | `v8std_get_related` to widen context |
 
 Native discovery tools (`Grep`, `Glob` / file search, directory listing, bulk `Read`) are absent from this table on purpose — they are not a first pick for any of these needs.
 

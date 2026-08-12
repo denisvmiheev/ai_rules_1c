@@ -42,10 +42,10 @@ See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1
    - **`answer_metadata_question`** — natural-language Q&A. Treat its output as a draft hint; verify each fact against deterministic tools before reporting.
 2. **`1c-code-metadata-mcp`** (fallback when graph server is unavailable or returns nothing)
    - `codesearch`, `metadatasearch` (`names_only=true` for compact lists), `get_metadata_details`, `search_function`, `get_module_structure`, `get_method_call_hierarchy`, `graph_dependencies`, `bsl_scope_members`, `helpsearch`, `search_forms`, `inspect_form_layout`.
-3. **`1c-templates-mcp`** — **`templatesearch` only:** task-description `query` + pre-flight (`docs/1c-templates-mcp.md → Query formulation (templatesearch only)`); **`recall`** for project notes. Does not change how other tools are queried.
+3. **`1c-templates-fastcode`** — **`templatesearch` only:** task-description `query` + pre-flight (`docs/1c-templates-fastcode.md → Query formulation (templatesearch only)`); **`recall`** for project notes. Does not change how other tools are queried.
 4. **`1c-ssl-mcp`** — `ssl_search` to check whether a standard SSL/БСП function already covers the need.
-5. **`1C-docs-mcp`** — `docinfo` for known names, `docsearch` for description-based lookup of platform APIs.
-6. **`1c-code-check-mcp`** — `its_help` → **always follow up with** `fetch_its` to read full ITS articles.
+5. **`1c-platform-mcp`** — `docinfo` for known names, `docsearch` for description-based lookup of platform APIs.
+6. **`v8std-local`** — `v8std_search` / `v8std_explain_diagnostics` → **`v8std_get_page`** to read full standard/diagnostic text (see `docs/v8std.md`). Use **`1c-code-check-mcp`**'s `its_help` → `fetch_its` instead if that server is used.
 7. **Grep / Glob / `Read`-scanning** — only as an absolute last resort. Locating files by mask (`**/*.bsl`, `**/*.xml`), listing directories, reading modules one after another to find something, and reading a whole module for the sake of one routine (prefer `get_module_structure` / `search_code` `detail_level="L0"` / `search_function`) are the same last-resort step as `Grep` — not a separate free action. Reading a file whose path came from an MCP result is normal work and needs no justification.
 
 **Before falling back to Grep / Glob / `Read`-scanning, state explicitly in the response which MCP tools were tried and why they did not return what was needed (one or two sentences).**
@@ -94,7 +94,7 @@ If the question is ambiguous and cannot be sharpened from context, ask **one** c
 | Who calls a routine | `trace_call_chain(routine_name=..., object_name=..., direction="callers", depth=3)` or `get_method_call_hierarchy(method_name=...)` |
 | Reuse check | `templatesearch(query)` + `ssl_search(query)` |
 | Platform API verification | `docinfo(name)` or `docsearch(query)` |
-| ITS standards lookup | `its_help(query)` → `fetch_its(id)` for every relevant article |
+| ITS standards lookup | `v8std_search(query)` / `v8std_explain_diagnostics(codes)` on `v8std-local` |
 
 ### 3. Verify before reporting
 

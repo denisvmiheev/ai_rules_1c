@@ -1,8 +1,8 @@
-# 1C-docs-mcp — tool catalog
+# 1c-platform-mcp — tool catalog
 
 1C platform documentation: search by description (vector + BM25) and exact lookup by name.
 
-> Load this file only if the `1C-docs-mcp` server is actually available in the current session.
+> Load this file only if the `1c-platform-mcp` server is actually available in the current session.
 
 | Tool | Purpose | When to use |
 |---|---|---|
@@ -45,7 +45,7 @@ Skipping this check and hand-rolling a capability from a trigger domain is a def
 
 ## Using a found platform mechanism
 
-> Canon for `AGENTS.md → MCP Tool Calling → A.7` (reuse half). Applies to **`docsearch` / `docinfo`** (and БСП via `ssl_search`) — **not** to **`templatesearch`** (code templates — `1c-templates-mcp.md → Using a found template`).
+> Canon for `AGENTS.md → MCP Tool Calling → A.7` (reuse half). Applies to **`docsearch` / `docinfo`** (and БСП via `ssl_search`) — **not** to **`templatesearch`** (code templates — `1c-templates-fastcode.md → Using a found template`).
 
 When platform documentation (or БСП) confirms a built-in mechanism fits the task:
 

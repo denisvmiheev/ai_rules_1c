@@ -210,7 +210,7 @@ Constraints: `1c-code-reviewer` runs **only when the user explicitly asks for a 
 When the user asks for a review, the subagent looks at:
 
 - anti-patterns from `anti-patterns.md` and `platform-solutions.md`;
-- ITS standards via `its_help` → `fetch_its`;
+- ITS standards via `v8std_search` / `v8std_explain_diagnostics` on `v8std-local` (or `its_help` → `fetch_its` if the project runs `1c-code-check-mcp` instead);
 - BSL LS warnings via `review_1c_code`;
 - query patterns, transactional safety, lock granularity, posting boundaries.
 

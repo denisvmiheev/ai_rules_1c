@@ -1,8 +1,8 @@
-# 1c-templates-mcp — tool catalog
+# 1c-templates-fastcode — tool catalog
 
 Code template library (`templatesearch`) and project vector memory (`remember` / `recall`). Memory routing rules live in `AGENTS.md → Project memory`.
 
-> Load this file only if the `1c-templates-mcp` server is actually available in the current session.
+> Load this file only if the `1c-templates-fastcode` server is actually available in the current session.
 
 | Tool | Parameters | Purpose | When to use |
 |---|---|---|---|
@@ -12,7 +12,7 @@ Code template library (`templatesearch`) and project vector memory (`remember` /
 
 ## Query formulation (`templatesearch` only)
 
-> **Scope — read first.** Everything in this section applies **only** to the **`templatesearch`** tool on this server. It does **not** apply to `docsearch`, `codesearch`, `search_code`, `metadatasearch`, `ssl_search`, `recall`, or any other MCP tool — those keep their own query registers (keywords, identifiers, Lucene, chapter titles, etc.). **Do not** pass task-description prose to `docsearch` / `codesearch` because of this rule, and **do not** pass keyword salad to `templatesearch` because other tools accept keywords.
+> **Scope — read first.** Everything in this section applies **only** to the **`templatesearch`** tool on this server. It does **not** apply to `docsearch`, `search_in_code`, `get_metadata_objects`, `ssl_search`, `recall`, or any other MCP tool — those keep their own query registers (keywords, identifiers, dotted paths, chapter titles, etc.). **Do not** pass task-description prose to `docsearch` / `search_in_code` because of this rule, and **do not** pass keyword salad to `templatesearch` because other tools accept keywords.
 
 Templates are **ready-made solutions to typical tasks**, indexed by how tasks are described. For **`templatesearch` only**, the `query` argument must be the **user's task description** — Russian prose stating what to achieve — not a compressed keyword line and not query-language tokens.
 
@@ -20,7 +20,7 @@ Templates are **ready-made solutions to typical tasks**, indexed by how tasks ar
 
 Run on the `query` string **before** invoking **`templatesearch`**. If any check fails — rewrite; **do not call**.
 
-1. **Tool check.** You are about to call **`templatesearch`** — not `docsearch`, not `codesearch`. This checklist applies to **`templatesearch` only**.
+1. **Tool check.** You are about to call **`templatesearch`** — not `docsearch`, not `search_in_code`. This checklist applies to **`templatesearch` only**.
 2. **Verbatim-first (first call).** If the user gave the task in natural language — pass that text **verbatim** (trim outer whitespace only) or a multi-clause paraphrase with the same goal. Do not invent a shorter "search phrase".
 3. **Sentence test.** The `query` must read as one or more complete Russian sentences (subject + goal). Tag lists and «topic + topic + запрос + TOKEN» lines **fail**.
 4. **No query-language tokens** unless the user literally wrote them: `ВЫБРАТЬ`, `ПОМЕСТИТЬ`, `СОЕДИНЕНИЕ`, `КОЛИЧЕСТВО`, `ГДЕ`, `ЛЕВОЕ`, `ОБЪЕДИНИТЬ`, …
@@ -43,18 +43,18 @@ Calling **`templatesearch`** with keyword salad is a **defect equal to skipping*
 
 ### If the first `templatesearch` query misses
 
-Reformulate as a **different task description** (rephrase the goal, add one clause from the user text) — up to 2 attempts. **Never** append keywords or query tokens. **Do not** switch to keyword style used for `docsearch` / `codesearch`.
+Reformulate as a **different task description** (rephrase the goal, add one clause from the user text) — up to 2 attempts. **Never** append keywords or query tokens. **Do not** switch to keyword style used for `docsearch` / `search_in_code`.
 
 ## Using a found template (`templatesearch` only)
 
-> Canon for `AGENTS.md → MCP Tool Calling → A.9`. Applies **after** a successful **`templatesearch`** — not to `docsearch` / platform docs (those follow `1C-docs-mcp.md → Using a found platform mechanism`).
+> Canon for `AGENTS.md → MCP Tool Calling → A.9`. Applies **after** a successful **`templatesearch`** — not to `docsearch` / platform docs (those follow `1c-platform-mcp.md → Using a found platform mechanism`).
 
 When **`templatesearch`** returns a template that matches the task (same goal: e.g. «вывести группы справочника и уровень иерархии», «обход иерархии запросом», «HTTP JSON интеграция»):
 
 1. **Treat it as the primary artifact** — the template body (query text, procedure skeleton, pattern) is the starting point, not a hint to ignore.
 2. **Adapt, do not reinvent** — change only what the task requires: substitute metadata / attribute names, adjust filters, wire into the target module, wrap in project conventions (regions, export, error handling per project rules). Keep the proven structure (virtual tables, temp-table shape, join order, platform API calls).
 3. **Do not rewrite from scratch** when the template already solves the core problem. Reimplementing the same algorithm «in your own words» is a defect equal to skipping **`templatesearch`**.
-4. **No match after honest search** — only then design from project code (`codesearch`) or from platform docs (`docsearch` / `docinfo`). Say briefly that no fitting template was found.
+4. **No match after honest search** — only then design from project code (`search_in_code`) or from platform docs (`docsearch` / `docinfo`). Say briefly that no fitting template was found.
 
 ### Template disposition (lightweight)
 
@@ -62,28 +62,13 @@ The obligation is scoped to **goal-matching** templates only. Vector search alwa
 
 1. **Match found → copy-then-adapt.** Start the draft by **pasting the template body** (query / code), then edit it toward the task. Do not write a fresh draft «по мотивам»: if the delivered query / code shares no recognizable structure with the template you built on (temp-table chain, join order, algorithm skeleton, platform API calls), the delivery is defective — redo it from the template. In the final answer, name the base in one line: `Template: <short name> — used as base`.
 2. **No match → one short note.** «Подходящего шаблона не нашлось» (item 4 above) is enough; do not enumerate or critique the non-matching candidates.
-3. **Rejecting a goal-matching template needs a narrow, nameable reason.** Exactly three are valid:
-   - a platform-version / `РежимСовместимости` incompatibility confirmed by docs;
-   - an explicit user requirement the template contradicts;
-   - **a project-rule violation you can name** — an anti-pattern from `anti-patterns.md`, a forbidden construct from `dev-standards-code-style.md §2`, or a documented ITS-standard violation. Naming it is mandatory: "выглядит неоптимально" is not a reason, «запрос в цикле (`anti-patterns.md §1`)» is.
-
-   «Мне удобнее по-другому», style preference, distrust of the template's shape, or the urge to rewrite are **not** valid reasons. A template that solves the core task but needs adaptation is a **match** — adapt it (item 1 above), do not reject it.
-
-4. **A project-rule violation is a reason to fix the template, not usually to drop it.** Most findings are local — a missing `ПЕРВЫЕ N`, a redundant `РАЗЛИЧНЫЕ`, an unindexed temp table, a `Сообщить()` call, a `Попытка` around a DB read. Keep the template's proven structure and repair the defect in place; report it as `Template: <short name> — used as base, fixed: <anti-pattern>`. Full rejection is correct only when the violation **is** the structure (the template's core algorithm is a query in a loop, a correlated subquery per row, an object read inside a posting loop) — there the salvageable part is the intent, not the code. Report that as `Template: <short name> — rejected: <anti-pattern / rule>`.
-
-   The template library is not a source of truth about project standards: a template that predates a rule still returns as a match. This item is the only legitimate channel for that case — silently hand-rolling an equivalent and saying nothing remains a defect (item 2 of *Using a found template*).
+3. **Rejecting a goal-matching template needs a narrow reason**: a platform-version / `РежимСовместимости` incompatibility confirmed by docs, or an explicit user requirement the template contradicts. «Мне удобнее по-другому», style preference, distrust of the template's shape, or the urge to rewrite are **not** valid reasons. A template that solves the core task but needs adaptation is a **match** — adapt it (item 1 above), do not reject it.
 
 **Good:** template has a hierarchical-catalog query → paste/adapt its query, rename `Справочник.Номенклатура` and output fields to the task; final answer says which template was the base.
 
 **Good:** search returned 5 candidates, none solves the task's goal → one line «no fitting template found», solution designed from project code / docs; no candidate-by-candidate review.
 
-**Good:** goal-matching template selects the whole table without `ПЕРВЫЕ N` → keep the template's structure, add the limit, report `Template: <name> — used as base, fixed: missing ПЕРВЫЕ N (anti-patterns.md §5)`.
-
-**Good:** goal-matching template's core algorithm reads each document object inside a loop → structural anti-pattern, rebuild as a set-based query, report `Template: <name> — rejected: object read in a loop (anti-patterns.md §1)`.
-
 **Defect:** template returned the standard «groups + hierarchy level» query → agent writes a different query from memory instead.
-
-**Defect:** agent rejects a goal-matching template as «неоптимальный» without naming the rule it violates — an unnamed objection is a style preference, not a reason.
 
 **Defect:** template found and goal-matching → agent silently ignores it and delivers a hand-rolled equivalent.
 
@@ -92,7 +77,7 @@ The obligation is scoped to **goal-matching** templates only. Vector search alwa
 | Tool | `query` register (unchanged by this file) |
 |---|---|
 | **`docsearch`** | Platform-doc topic / capability name |
-| **`codesearch` / `search_code`** | Identifier, literal, metadata path |
+| **`search_in_code`** | Identifier, literal, metadata path |
 | **`recall`** | Key terms from the task |
 | **`ssl_search`** | Capability / API description |
 
@@ -106,7 +91,7 @@ The obligation is scoped to **goal-matching** templates only. Vector search alwa
 
 ### Memory gates — hard checks (canon: `AGENTS.md → Project memory → Memory gates`)
 
-1. **Correction-capture gate.** Any user message that corrects your output, rejects an approach, clarifies a non-obvious fact, or states a standing condition **must produce a `remember` call in the same turn** (fallback: a dated entry appended to `memory.md` when the server is unavailable). Before ending such a turn, run the check: *did this message change how I or the next session should work? → saved?* Replying to the correction without saving it is a defect — the correction is lost for every future session.
+1. **Correction-capture gate.** Any user message that corrects your output, rejects an approach, clarifies a non-obvious fact, or states a standing condition **must produce a `remember` call in the same turn** (fallback: `memory.md → Captured during work` when the server is unavailable). Before ending such a turn, run the check: *did this message change how I or the next session should work? → saved?* Replying to the correction without saving it is a defect — the correction is lost for every future session.
 2. **Recall-first gate.** For any non-trivial 1C task, `recall` runs **before** solution design — same standing as `templatesearch` in the pre-flight. Skipping it while the server is exposed is a defect.
 3. **Memory line in the final answer.** Non-trivial tasks report memory usage in one line: `Memory: recalled <n> notes / nothing relevant; saved <n> notes / nothing to save`. This makes silent skips visible and reviewable.
 
@@ -116,4 +101,4 @@ The obligation is scoped to **goal-matching** templates only. Vector search alwa
 
 ## Availability check
 
-Treat the server as **available** only if the `remember` and `recall` tools are actually present in the current session's tool schema. The mere presence of `1c-templates-mcp` in `mcp-servers.json` does not prove availability. If `recall` returns a connection error — switch to memory fallback mode (see `AGENTS.md → Project memory → Availability`).
+Treat the server as **available** only if the `remember` and `recall` tools are actually present in the current session's tool schema. The mere presence of `1c-templates-fastcode` in `.mcp.json` does not prove availability. If `recall` returns a connection error — switch to memory fallback mode (see `AGENTS.md → Project memory → Availability`).

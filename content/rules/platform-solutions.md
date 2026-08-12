@@ -110,7 +110,7 @@ For form attributes with reference or composite types — first copy the value t
 КонецПопытки;
 ```
 
-**Standard.** ITS: "Использование транзакций".
+**Standard.** ITS: "Использование транзакций" — [std783](https://v8std.ru/std/783/) "Транзакции: правила использования".
 
 ---
 
@@ -160,7 +160,7 @@ For form attributes with reference or composite types — first copy the value t
 // On the client - ТекущаяДата() is acceptable, but obtaining it from the server is preferred
 ```
 
-**Standard.** ITS: "Использование функций для работы с датой и временем".
+**Standard.** ITS: "Использование функций для работы с датой и временем" — [std643](https://v8std.ru/std/643/) "Работа в разных часовых поясах".
 
 ---
 
@@ -214,7 +214,7 @@ For form attributes with reference or composite types — first copy the value t
 КонецПроцедуры
 ```
 
-**Standard.** ITS: "Внешние компоненты, асинхронный интерфейс".
+**Standard.** ITS: "Внешние компоненты, асинхронный интерфейс" — [std700](https://v8std.ru/std/700/) "Установка внешних компонент и расширений платформы".
 
 ---
 
@@ -248,7 +248,7 @@ Headlines of the rules to follow: lock **before** reading; use `Исключит
 
 **Authoritative deep-dive — `locks-and-transactions.md`.** That file covers the full theory: transaction boundaries, implicit vs explicit transactions, lock-ordering contract for the whole project, mass-operation patterns, status-log pattern, and the technological-log diagnostics (`TLOCK` / `TDEADLOCK`). When designing a new posting path or debugging a deadlock — read it first.
 
-**Standard.** ITS: "Управление блокировкой данных в транзакции", "Особенности проведения документов".
+**Standard.** ITS: "Управление блокировкой данных в транзакции" — [std460](https://v8std.ru/std/460/) "Использование управляемого режима блокировки"; "Особенности проведения документов" — [std603](https://v8std.ru/std/603/) "Требования к проведению документов".
 
 ---
 

@@ -48,6 +48,7 @@ The gate descriptions below state the `full` behaviour — the strictest level, 
 - Pass criterion: no `error` severity items.
 - `warning` items: same triage rule as Gate 2.
 - For specific warnings that are intentional and justified: add a `//BSLLS:<rule>` suppression with a 1-line explanation, per `dev-standards-code-style.md → "Formatting"`. Blanket suppressions without justification are forbidden.
+- For a finding whose rationale is unclear from `review_1c_code` alone, or when a review explicitly needs the ITS citation: `v8std_explain_diagnostics` on `v8std-local` (see `.claude/skills/mcp-1c-tools/docs/v8std.md`) resolves a diagnostic code to its standard clause. On a project without `v8std-local`, `its_help` → `fetch_its` (`1c-code-check-mcp`) is the alternate path.
 
 ### Graceful degradation for Gates 1–3 — when a validator is not exposed
 

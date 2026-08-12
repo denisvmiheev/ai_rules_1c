@@ -189,7 +189,7 @@ Visual form editing in extensions — **minimize**. Changes — programmatically
 
 ## 4. Data Access — Reference Attribute Access
 
-**Direct dot-notation access on references** (e.g. `Контрагент.ИНН`) loads the entire object from the database. **[Project rule — stricter than ITS standard.]** Outside trivial single-call handlers, the rule is a hard ban; in simple, non-loop code with one or two attributes ITS allows it, but the project default is to use dedicated БСП methods.
+**Direct dot-notation access on references** (e.g. `Контрагент.ИНН`) loads the entire object from the database. **[Project rule — stricter than ITS standard — [std496](https://v8std.ru/std/496/) "Чтение отдельных реквизитов объекта из базы данных".]** Outside trivial single-call handlers, the rule is a hard ban; in simple, non-loop code with one or two attributes ITS allows it, but the project default is to use dedicated БСП methods.
 
 Use these methods instead:
 

@@ -33,7 +33,7 @@ See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1
 - **search_function** — find specific procedures for targeted optimization
 - **check_1c_code** — analyze code for performance and logic issues
 - **rewrite_1c_code** — get AI-optimized version of code (with `goal: optimize`; output is a draft — re-validate)
-- **its_help** → **fetch_its** — find ITS performance standards and best practices
+- **v8std_search** on `v8std-local` — ITS performance-standard clauses by topic ("оптимизация запроса", "минимизация серверных вызовов"); see `docs/v8std.md`. Use **its_help** → **fetch_its** instead if the project runs `1c-code-check-mcp`.
 - **syntaxcheck** — verify syntax after changes
 - **review_1c_code** — style and ITS-standards compliance of the changed code
 

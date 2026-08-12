@@ -50,7 +50,7 @@ Load `content/rules/coding-standards.md` first; for forms use `forms.md`, for no
 6. **syntaxcheck** — reject syntax-broken input before AI review.
 7. **check_1c_code** — bugs and performance issues.
 8. **review_1c_code** — style and ITS compliance.
-9. **its_help** → **fetch_its** — cross-check against ITS standards.
+9. **v8std_explain_diagnostics** on `v8std-local` — cross-check a finding's check id against its ITS standard (or **its_help** → **fetch_its** on `1c-code-check-mcp` if that server is used instead).
 
 ## Architecture Design
 
@@ -93,7 +93,7 @@ Load `content/rules/coding-standards.md` first; for forms use `forms.md`, for no
 6. **rewrite_1c_code** — AI optimization (`goal: optimize`); re-validate with
    `syntaxcheck` → `check_1c_code` → `review_1c_code`.
 7. **templatesearch** — optimized templates.
-8. **its_help** → **fetch_its** — ITS performance standards.
+8. **v8std_search** on `v8std-local` — ITS performance-standard clauses by topic ("оптимизация запроса", "индексация временных таблиц"); see `docs/v8std.md` (or **its_help** → **fetch_its** on `1c-code-check-mcp` if that server is used instead).
 9. **validatequery** → **vcexecutequery** (`1c-data-mcp`, if available) — parse-check the rewritten query, then run it read-only against the live IB to compare row counts / spot Cartesian explosions / confirm a virtual-table state. Use only on a test or copy IB when production data volumes matter.
 
 ## Refactoring
@@ -151,7 +151,7 @@ Use this playbook when writing HTTP services / clients, REST integrations, file 
 4. **docinfo** — verify platform types by exact name (`HTTPСоединение`, `HTTPЗапрос`, `ЧтениеJSON`, `ЗаписьJSON`, `ЗаписьXML`, `ЧтениеXML`).
 5. **docsearch** — fallback when the exact platform-API name is unknown.
 6. **get_xsd_schema** + **verify_xml** — when the contract is XML with a known XSD.
-7. **its_help** → **fetch_its** — ITS articles on long-running operations, secure password storage, asynchronous external components.
+7. **v8std_search** on `v8std-local` — ITS articles on long-running operations, secure password storage, asynchronous external components; see `docs/v8std.md` (or **its_help** → **fetch_its** on `1c-code-check-mcp` if that server is used instead).
 8. **search_function** + **get_module_structure** — locate or extend the integration common module (typically `*HTTPClient`, `*Integration`, `*Exchange`).
 9. After implementation: **syntaxcheck** → **check_1c_code** → **review_1c_code**.
 
@@ -162,7 +162,7 @@ Use this playbook when writing HTTP services / clients, REST integrations, file 
 3. **get_module_structure** — list of procedures/functions.
 4. **docinfo** — documentation by exact name; **docsearch** — search by description.
 5. **helpsearch** — existing help articles.
-6. **its_help** → **fetch_its** — methodological ITS articles.
+6. **v8std_search** on `v8std-local` — methodological ITS articles by topic; see `docs/v8std.md` (or **its_help** → **fetch_its** on `1c-code-check-mcp` if that server is used instead).
 7. **search_1c_documentation** — version-specific platform documentation.
 
 ## Comparing Platform Versions

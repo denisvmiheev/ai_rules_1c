@@ -44,7 +44,7 @@ Default mental model: *"can a user ask for a balance on a date?"* → accumulati
 
 - Mark dimensions as `Индексировать` only when they participate in queries / virtual-table parameters that do **not** include all preceding dimensions. The first dimension does not need an explicit index — the platform builds it.
 - For information registers used as a lookup by a non-leading dimension subset, mark exactly those dimensions as `Индексировать`. Do not "index everything just in case" — every index slows writes.
-- For accounting registers — special handling, see ITS.
+- For accounting registers — special handling; search `v8std_search("регистр бухгалтерии")` on `v8std-local` for the applicable ITS clauses (e.g. [std663](https://v8std.ru/std/663/) "Режим разделения итогов для регистров бухгалтерии").
 
 ## 6. Subordination to a registrar (only for accumulation / accounting / calculation)
 

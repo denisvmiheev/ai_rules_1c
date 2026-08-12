@@ -66,7 +66,7 @@ See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1
 - **get_method_call_hierarchy** — trace call chains, find affected callers
 - **check_1c_code** — analyze code for syntax, logic and performance issues
 - **review_1c_code** — check style, ITS standards, naming, structure compliance
-- **its_help** → **fetch_its** — verify code against ITS standards (always read full article by ID)
+- **v8std_explain_diagnostics** / **v8std_search** on `v8std-local` — resolve a finding to its ITS standard clause; **v8std_get_page** for the full text (see `docs/v8std.md`). Use **its_help** → **fetch_its** instead if the project runs `1c-code-check-mcp`.
 
 **SDD Integration:** If the project has an `openspec/` workspace, read `content/rules/sdd-integrations.md` for OpenSpec integration guidance.
 
