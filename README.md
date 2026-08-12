@@ -4,6 +4,21 @@
 
 `1c-rules` — это переносимый набор правил, ролей субагентов, on-demand инструкций и интеграций для разработки в `1С:Предприятие 8` (BSL) с помощью ИИ-агентов. Содержимое раскладывается в проект единым установщиком и адаптируется под формат каждого инструмента.
 
+## Relationship to upstream
+
+This is a personal fork of [`comol/ai_rules_1c`](https://github.com/comol/ai_rules_1c). Default MCP catalog (`content/mcp-servers.json`) and the core discovery/verification/subagent tooling are migrated to `edt-mcp` (1C:EDT MCP plugin) plus `v8std-local` (ITS standards) instead of upstream's classic docker-distribution servers — see `content/skills/mcp-1c-tools/docs/edt-mcp.md` for the mapping. `/updaterules` and `install.ps1`'s default `-Source` point at **this** repository, not upstream — projects installed from here stay on this fork's architecture across updates.
+
+To pull upstream improvements into this fork:
+
+```bash
+git remote add upstream https://github.com/comol/ai_rules_1c.git   # once
+git fetch upstream
+git merge upstream/main   # resolve conflicts in content/, keep the edt-mcp/v8std-local choices
+git push origin main
+```
+
+Expect conflicts in the files this fork rewrote most: `content/mcp-servers.json`, `content/skills/mcp-1c-tools/SKILL.md` and `docs/`, `content/rules/{mcp-first-search,verification-gates,tooling-playbooks}.md`, `content/agents/*.md`, `content/commands/checkmcp.md`, `AGENTS.md`, `AGENT-INSTALL.md`. Resolve by keeping this fork's tool names/architecture while accepting upstream's unrelated fixes (new rules, new agents, bug fixes elsewhere) as-is.
+
 ## Под какие ИИ-агенты адаптированы правила
 
 Правила и команды собираются под конкретный инструмент адаптерами из `adapters/*.yaml`. Поддерживаются:
@@ -26,7 +41,7 @@
 
 Установка спроектирована как протокол, который выполняет сам ИИ-агент. Откройте проект в любимом ИИ-агенте (Cursor / Claude Code / Codex / OpenCode / Kilo Code / Kimi / Qwen / Command Code / Cline / Pi) и отправьте сообщение:
 
-> Установи правила из `https://github.com/comol/ai_rules_1c` по `AGENT-INSTALL.md`.
+> Установи правила из `https://github.com/denisvmiheev/ai_rules_1c` по `AGENT-INSTALL.md`.
 
 Всё. Остальное — клонирование репозитория, определение активных инструментов, миграция существующих `AGENTS.md` / `CLAUDE.md`, запросы перед разрушительными действиями — описано в [`AGENT-INSTALL.md`](AGENT-INSTALL.md), который агент прочитает сам.
 
@@ -35,7 +50,7 @@
 Если агент не справляется (ограниченная среда, нет FS-доступа, нужен детерминированный CI-запуск) — тот же протокол реализован как PowerShell-скрипт `install.ps1`:
 
 ```powershell
-git clone https://github.com/comol/ai_rules_1c.git $env:TEMP\1c-rules
+git clone https://github.com/denisvmiheev/ai_rules_1c.git $env:TEMP\1c-rules
 & $env:TEMP\1c-rules\install.ps1 init -Source $env:TEMP\1c-rules
 ```
 
@@ -44,7 +59,7 @@ git clone https://github.com/comol/ai_rules_1c.git $env:TEMP\1c-rules
 Параметр `-Source` также принимает URL напрямую — в этом случае установщик сам делает shallow-clone в кэш под `$env:TEMP` (ключ кэша — хэш URL) и переиспользует его при повторных запусках; требует `git` в `PATH`:
 
 ```powershell
-.\install.ps1 init -Source https://github.com/comol/ai_rules_1c
+.\install.ps1 init -Source https://github.com/denisvmiheev/ai_rules_1c
 ```
 
 Команды: `init` / `update` / `add <tool>` / `remove [<tool>]` / `doctor` / `eject`.
