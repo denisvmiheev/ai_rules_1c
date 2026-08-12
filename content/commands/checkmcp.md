@@ -22,6 +22,8 @@ The source of truth for images, ports, and environment variables is [docs.onerpa
 | `1c-graph-metadata-mcp` | 8006 | `comol/1c_graph_metadata_mcp:latest` | Graph search (Neo4j) | Yes — dump + Neo4j |
 | `1c-code-check-mcp` | 8007 | `comol/1c_code_checker_mcp:latest` | 1C:Assistant, ITS | No (Assistant token) |
 | `1c-data-mcp` | 80 / project | — (HTTP service on the infobase, **not** docker) | 1C data management and analysis (HTTP service published on the infobase itself) | Yes — `INFOBASE_PUBLISH_URL` in `.dev.env` + `mcp` HTTP service published on the infobase **with anonymous access** |
+| `edt-mcp` | 8766 | — (MCP plugin **inside 1C:EDT**, **not** docker) | Metadata discovery & typed mutation, BSL read/write & navigation, EDT validation, debug/testing, DB update, event log — this fork's default 1C server, see `content/skills/mcp-1c-tools/docs/edt-mcp.md` | No container to install — start 1C:EDT with the [EDT-MCP plugin](https://github.com/DitriXNew/EDT-MCP) enabled |
+| `v8std-local` | 8765 | — (git clone + `docker compose`, **not** a published docker image) | Read-only v8std.ru mirror: ITS standards search, diagnostic↔standard mapping (ACC/АПК, BSLLS, EDT, v8-code-style) — this fork's default ITS-lookup server, see `content/skills/mcp-1c-tools/docs/v8std.md` | No — free, CC0, no license key; see the install note below |
 
 > Exact image names may differ by version. If `docker pull` fails with `manifest unknown`, check the current list at [docs.onerpa.ru/mcp-servery-1c/servery.md](https://docs.onerpa.ru/mcp-servery-1c/servery.md).
 
@@ -82,7 +84,7 @@ The source of truth for images, ports, and environment variables is [docs.onerpa
 
 For each `id`, determine **TOOLS_OK** / **TOOLS_MISSING**:
 
-- **TOOLS_OK** — this server's tools are visible in the current session tool schema (for example, `syntaxcheck` for `1c-syntax-checker-mcp`, `templatesearch`/`recall` for `1c-templates-mcp`, `ssl_search` for `1c-ssl-mcp`, `docinfo`/`docsearch` for `1C-docs-mcp`, `metadatasearch`/`codesearch` for `1c-code-metadata-mcp`, `search_metadata`/`get_object_dossier` for `1c-graph-metadata-mcp`, `check_1c_code`/`its_help` for `1c-code-check-mcp`).
+- **TOOLS_OK** — this server's tools are visible in the current session tool schema (for example, `syntaxcheck` for `1c-syntax-checker-mcp`, `templatesearch`/`recall` for `1c-templates-mcp`, `ssl_search` for `1c-ssl-mcp`, `docinfo`/`docsearch` for `1C-docs-mcp`, `metadatasearch`/`codesearch` for `1c-code-metadata-mcp`, `search_metadata`/`get_object_dossier` for `1c-graph-metadata-mcp`, `check_1c_code`/`its_help` for `1c-code-check-mcp`, `get_metadata_objects`/`search_in_code` for `edt-mcp`, `v8std_search`/`v8std_explain_diagnostics` for `v8std-local`).
 - **TOOLS_MISSING** — no tools are visible in the schema.
 
 If status is **TOOLS_OK**, treat the server as working and do not check it further.
@@ -99,7 +101,9 @@ $servers = @(
     @{ Id = '1c-templates-mcp';       Port = 8004 },
     @{ Id = '1c-graph-metadata-mcp';  Port = 8006 },
     @{ Id = '1c-code-check-mcp';      Port = 8007 },
-    @{ Id = '1c-ssl-mcp';             Port = 8008 }
+    @{ Id = '1c-ssl-mcp';             Port = 8008 },
+    @{ Id = 'v8std-local';            Port = 8765 },
+    @{ Id = 'edt-mcp';                Port = 8766 }
 )
 foreach ($s in $servers) {
     $url = "http://localhost:$($s.Port)/mcp"
@@ -172,9 +176,10 @@ Possible outcomes:
   docker start <container_name>
   ```
 
-  Default names: `1c_syntaxcheck_mcp`, `1c_templates_mcp`, `mcp_ssl_server`, `1c_help_mcp`, `1c_code_metadata_mcp`, `1c_graph_metadata_mcp`, `1c_code_checker_mcp` (check the actual name in `docker ps -a`). **External mode:** take the project container names from `projects.registry.json` → project row → `containers.*` (e.g. `mcp_<id>_code_metadata`), not from the defaults.
+  Default names: `1c_syntaxcheck_mcp`, `1c_templates_mcp`, `mcp_ssl_server`, `1c_help_mcp`, `1c_code_metadata_mcp`, `1c_graph_metadata_mcp`, `1c_code_checker_mcp`, `v8std-mcp` (check the actual name in `docker ps -a`). **External mode:** take the project container names from `projects.registry.json` → project row → `containers.*` (e.g. `mcp_<id>_code_metadata`), not from the defaults.
 
 - The container is absent from `docker ps -a` → **CONTAINER_MISSING**. The image may already be cached (`docker images`), but the container was not created. Create and start it — see Step 5.
+- `edt-mcp` has **no docker container at all** — it is a plugin inside a running 1C:EDT instance. If `edt-mcp` is **HTTP_DOWN**, the fix is "start 1C:EDT with the MCP plugin enabled", not a `docker` command; skip it in this step and in Step 5.
 
 ### Step 5. Install missing server
 
@@ -239,7 +244,19 @@ docker run -d -p 8007:8007 --name 1c_code_checker_mcp `
   comol/1c_code_checker_mcp:latest
 ```
 
-Exact current commands for each server are on the server-specific documentation page:
+**`v8std-local`** uses a different install mechanism — a self-hosted git repository with `docker compose`, not a published image and not `docker run`. No `LICENSE_KEY`, no data preparation, free (CC0 license). Source and details: <https://v8std.ru/support/>.
+
+```powershell
+git clone https://github.com/zeegin/v8std.git {DATA_ROOT}\v8std
+cd {DATA_ROOT}\v8std
+docker compose -f docker-compose/docker-compose.yml up -d v8std-mcp
+```
+
+The container reads `docs/ai/pages.jsonl` and `docs/ai/search-vectors.jsonl` and generates them on first startup if absent — the first `up` may take longer than a normal container start. Resulting endpoint: `http://127.0.0.1:8765/mcp`. Management: `docker logs v8std-mcp`, `docker compose -f docker-compose/docker-compose.yml restart v8std-mcp`. A native (non-docker) Python setup is also documented on the support page for environments without Docker.
+
+**`edt-mcp`** has no install step here at all — see the catalog note above; it comes up automatically once 1C:EDT is running with the plugin.
+
+Exact current commands for each classic-distribution server are on the server-specific documentation page:
 
 - [HelpSearchServer](https://docs.onerpa.ru/mcp-servery-1c/servery/help-search-server.md)
 - [CodeMetadataSearchServer](https://docs.onerpa.ru/mcp-servery-1c/servery/code-metadata-search.md)
