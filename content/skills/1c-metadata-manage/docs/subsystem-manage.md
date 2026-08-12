@@ -144,12 +144,10 @@ The PowerShell scripts under `tools/1c-subsystem-manage/scripts/` were refreshed
 
 ## MCP Integration
 
-- **get_object_dossier** — Comprehensive structural passport of objects before inclusion (structure, forms, dependencies, subscriptions, roles).
-- **metadatasearch** — Verify that objects referenced in subsystem content exist in the configuration.
-- **get_metadata_details** — Get structure of objects being included in the subsystem.
-- **trace_impact** — Recursive dependency analysis for subsystem composition: find all objects that depend on or are depended upon by the objects being included (preferred over `graph_dependencies` for deep analysis).
-- **graph_dependencies** — Flat dependency overview between objects.
-- **business_search** — Find related objects to include by natural language description.
+- **get_metadata_details** — Comprehensive structural passport of objects before inclusion (structure, forms, dependencies, subscriptions, roles).
+- **get_metadata_objects** — Verify that objects referenced in subsystem content exist in the configuration.
+- **find_references** — Dependency analysis for subsystem composition: which objects reference (or are referenced by) the objects being included.
+- **business_search** — Find related objects to include by natural language description. *(classic distribution only — on `edt-mcp` use `get_metadata_objects` + `search_in_code`.)*
 
 ## SDD Integration
 

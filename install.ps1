@@ -1792,7 +1792,7 @@ function Format-1cProjectMd {
     [void]$lines.Add('- Стандарты ИТС, расширенные правилами проекта (см. `AGENTS.md` и каталог on-demand правил активного инструмента)')
     [void]$lines.Add('- Запрет на тернарный оператор `?(...)`, `Сообщить()`, обращение к реквизитам через точку')
     [void]$lines.Add('- Перед написанием кода — поиск по `templatesearch` / `codesearch` / `search_code`')
-    [void]$lines.Add('- После написания кода — `syntaxcheck` → `check_1c_code` → `review_1c_code` (≤ 3 раза за цикл)')
+    [void]$lines.Add('- После написания кода — `revalidate_objects`/`validate_query` → `get_project_errors` → `get_check_description`/`get_problem_summary` (≤ 3 раза за цикл)')
     [void]$lines.Add('- Полный список запретов и стандартов — `AGENTS.md`, раздел *Forbidden Calls and Constructs*')
     return ($lines -join "`n") + "`n"
 }

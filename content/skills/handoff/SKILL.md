@@ -54,7 +54,7 @@ Bulleted list of real unresolved questions (architectural forks, waiting for the
 Only include the current session diff. If nothing changed, omit the section.
 
 ## Verification State
-Which gates from `verification-checklist.md` passed / failed / were skipped. Latest `syntaxcheck` / `check_1c_code` / `review_1c_code` result in brief (error count, key messages).
+Which gates from `verification-checklist.md` passed / failed / were skipped. Latest `revalidate_objects`/`validate_query` / `get_project_errors` / `get_check_description`/`get_problem_summary` result in brief (error count, key messages).
 
 ## Next Steps
 1-5 imperative items ("Check movements for `РегистрНакопления.<Имя>`", "Finish `ОбработкаПроведения` for document `<Имя>`").
@@ -62,7 +62,7 @@ Which gates from `verification-checklist.md` passed / failed / were skipped. Lat
 ## What To Load Next Session
 - **Subagents**: `1c-<name>` when the task matches their role (see `subagents.md`).
 - **On-demand rules**: `<name>.md` based on the task trigger (see `AGENTS.md → Additional rules`).
-- **MCP tools**: especially relevant tools (`get_object_dossier` for X, `trace_impact` before refactoring Y, `ssl_search` for topic Z).
+- **MCP tools**: especially relevant tools (`get_metadata_details` for X, `find_references` before refactoring Y, `ssl_search` for topic Z).
 - **Slash commands**: `/opsx:apply` when there is an active OpenSpec proposal, `/getconfigfiles` for metadata re-export, etc.
 
 ## Links (DO NOT copy content)
@@ -87,7 +87,7 @@ Which gates from `verification-checklist.md` passed / failed / were skipped. Lat
 
 ## Boundaries
 
-- Handoff is a session artifact, not configuration and not code. Do not run `syntaxcheck` / `check_1c_code` / `review_1c_code` against it.
+- Handoff is a session artifact, not configuration and not code. Do not run `revalidate_objects`/`validate_query` / `get_project_errors` / `get_check_description`/`get_problem_summary` against it.
 - Handoff **does not replace** an OpenSpec proposal. If the task requires a proposal and it does not exist yet, additionally suggest `/opsx:propose` and reference the future ID from the handoff.
 - Handoff **does not duplicate** `memory.md` and `recall` notes. Memory and handoff are different channels (see `AGENTS.md → Project memory`).
 - Handoff is written in normal grammar, not caveman style, so the next agent can read it without ambiguity.

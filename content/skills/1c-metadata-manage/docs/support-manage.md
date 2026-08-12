@@ -105,5 +105,5 @@ When a task changed support state, say it in one line in the report: which objec
 
 ## MCP Integration
 
-- **metadatasearch** / **get_metadata_details** — confirm you are targeting the right object before changing its support state.
+- **get_metadata_objects** / **get_metadata_details** — confirm you are targeting the right object before changing its support state.
 - **docsearch** — platform documentation on support rules and configuration updates.

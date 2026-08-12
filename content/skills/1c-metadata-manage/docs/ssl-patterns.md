@@ -25,7 +25,7 @@ When implementing new functionality:
    - Example: `ssl_search("фоновое задание прогресс")`
    - Example: `ssl_search("копирование структуры")`
 
-2. **Check existing patterns** — use `codesearch` to find how similar tasks are solved in the codebase
+2. **Check existing patterns** — use `search_in_code` to find how similar tasks are solved in the codebase
 
 3. **Use SSL if available** — it's tested, optimized, and maintained
 

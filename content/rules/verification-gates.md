@@ -47,7 +47,7 @@ The gate descriptions below state the `full` behaviour — the strictest level, 
 - These severities carry EDT's substantive checks: query defects (`ql-*`, e.g. `ql-temp-table-index`), transaction handling (`begin-transaction`), platform-standard violations. Use `get_check_description(checkId)` to read what a finding actually means before fixing or dismissing it — the check id and its short UID both come from the `get_project_errors` rows.
 - Pass criterion: no `BLOCKER` / `CRITICAL` item; a `MAJOR` item introduced by your change must be fixed or explicitly justified.
 - Pre-existing findings outside your scope — leave alone (Surgical Changes) and, when relevant, list them as follow-ups.
-- **Coverage gap.** There is no AI per-method analysis on `edt-mcp` (no `check_1c_code`-style AI pass). EDT checks are rule-based, so this gate does not catch reasoning-level defects on its own — pair it with the internal review checklist from `dev-standards-code-style.md §8` on any transactional / public-API / metadata-bearing change.
+- **Coverage gap.** There is no AI per-method analysis on `edt-mcp` (no `get_project_errors`-style AI pass). EDT checks are rule-based, so this gate does not catch reasoning-level defects on its own — pair it with the internal review checklist from `dev-standards-code-style.md §8` on any transactional / public-API / metadata-bearing change.
 
 ### Gate 3 — Style & standards (`get_project_errors` severity `MINOR` / `TRIVIAL` → `get_problem_summary`)
 
@@ -80,7 +80,7 @@ Gates 1–3 are static: they confirm that the code parses, follows standards, an
 
 **Execution:**
 
-- **Query text → `validatequery`.** Pass criterion: `"нет ошибок"`. This parses the query and resolves parameters; it does **not** execute it, does not verify that tables / fields exist, and does not evaluate RLS.
+- **Query text → `validate_query`.** Pass criterion: `"нет ошибок"`. This parses the query and resolves parameters; it does **not** execute it, does not verify that tables / fields exist, and does not evaluate RLS.
 - **Pure function → `vcexecutecode`** with a **read-only** fragment. Pass criterion: `"ошибок нет"`, or the expected value returned via `Результат`.
 - **Mutations are out of scope for this gate.** No `Записать()` / `Удалить()` / `НачалоТранзакции` / register movements — the read-only discipline and consent rules apply unchanged. If confirming the change requires a mutation, that is a task for `1c-tester` against a test base, not for this gate.
 - **Budget:** one call per artifact. Re-run only after the artifact changed — the no-change-repeat rule (`AGENTS.md → MCP Tool Calling → C.2`) applies.

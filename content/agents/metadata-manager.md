@@ -77,9 +77,9 @@ Before reporting success, apply `content/rules/verification-checklist.md` for th
 
 - [ ] Every assigned metadata operation is complete; nothing was silently skipped
 - [ ] No file outside the assigned scope was edited; no "while we're here" changes
-- [ ] `verify_xml` / form validators / skill validation scripts pass on every mutated artifact
-- [ ] Any touched BSL module passed `syntaxcheck` (and `check_1c_code` / `review_1c_code` within the budget when BSL was edited)
-- [ ] Impact of renames / removals / new wiring was considered (`trace_impact` / `graph_dependencies` when applicable)
+- [ ] `revalidate_objects` + `get_project_errors` / form validators / skill validation scripts pass on every mutated artifact
+- [ ] Any touched BSL module passed `revalidate_objects`/`validate_query` (and `get_project_errors` / `get_check_description`/`get_problem_summary` within the budget when BSL was edited)
+- [ ] Impact of renames / removals / new wiring was considered (`find_references` / `find_references` when applicable)
 
 If a criterion cannot be met, say so explicitly in the report — do not present a partial result as complete.
 
@@ -104,7 +104,7 @@ See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1
 **Other tools:**
 - **docsearch** — verify platform functions and XML element names
 - **templatesearch** — find examples of metadata structures
-- **syntaxcheck** — validate BSL module code; a blocking error requires a clean confirming run on the changed state within the budget from `AGENTS.md → MCP Tool Calling → B.1`
+- **revalidate_objects/validate_query** — validate BSL module code; a blocking error requires a clean confirming run on the changed state within the budget from `AGENTS.md → MCP Tool Calling → B.1`
 
 ## Important Rules
 

@@ -77,7 +77,7 @@ Canon — `AGENTS.md → Skills and Subagents`; exceptions only per `content/ski
 
 ### Verification checklist (mutating agents)
 
-Canon — `content/rules/verification-checklist.md` (ordered hard gates: `syntaxcheck` → `check_1c_code` → `review_1c_code` → impact analysis → metadata XML validation, as applicable).
+Canon — `content/rules/verification-checklist.md` (ordered hard gates: `revalidate_objects`/`validate_query` → `get_project_errors` → `get_check_description`/`get_problem_summary` → impact analysis → metadata XML validation, as applicable).
 
 **Subagent-specific:** for every mutated artifact, report each applicable validator's result and run count **after the final edit** — the parent reuses that evidence instead of repeating validators on unchanged content. Read-only agents (`1c-explorer`, `1c-analytic`, `1c-arch-reviewer`, `1c-code-reviewer`, `1c-doc-writer` when not writing project sources) skip the mutating gates and the metadata-skill gate but still follow CONFUSION and MCP-first search.
 
@@ -144,7 +144,7 @@ Return: locations with file/line references and qualified 1C names, usage catego
 
 ```text
 Read-only pattern search. Find existing implementations similar to <task>.
-Prefer templatesearch / ssl_search / search_code over raw grep. Do not edit files.
+Prefer templatesearch / ssl_search / search_in_code over raw grep. Do not edit files.
 Return: 3–7 best examples with paths and qualified names, which pattern to reuse, and what NOT to copy.
 ```
 
@@ -162,9 +162,9 @@ validation risks, and a suggested write scope for the implementation step.
 ```text
 Bounded implementation. You are not alone in the codebase; do not revert or overwrite edits
 outside your scope. Edit only: <files>. Implement <specific change> per the approved plan.
-Follow project rules (dev-standards-code-style, module-structure). For BSL run syntaxcheck →
-check_1c_code → review_1c_code on every touched module within the verification budget;
-for metadata XML run verify_xml (and both chains when it embeds BSL).
+Follow project rules (dev-standards-code-style, module-structure). For BSL run revalidate_objects/validate_query →
+get_project_errors → get_check_description/get_problem_summary on every touched module within the verification budget;
+for metadata XML run revalidate_objects + get_project_errors (and both chains when it embeds BSL).
 Return: changed files, diff summary against the plan, checks performed, unresolved risks.
 ```
 

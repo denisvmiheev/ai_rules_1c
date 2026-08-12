@@ -29,14 +29,14 @@ Fable 5 can overplan an ambiguous task and survey options it will not pursue.
 Instruction following is strong enough that a brief statement steers behaviour better than an enumerated list — and prescriptive scaffolding written for weaker models can *degrade* output here.
 
 - Treat the **process** guidance of this ruleset as intent: apply the spirit of triage, planning and reporting without mechanically expanding every checklist into extra work or extra prose.
-- Treat the **gates** literally: the `1c-metadata-manage` and infobase-tooling gates, MCP-first search, the platform-capability check, `templatesearch` and `recall`, the validator chain and its budget, `verify_xml`, and the evidence one-liners. These are not stylistic scaffolding — they encode consequences the model cannot infer from the code in front of it.
+- Treat the **gates** literally: the `1c-metadata-manage` and infobase-tooling gates, MCP-first search, the platform-capability check, `templatesearch` and `recall`, the validator chain and its budget, `revalidate_objects` + `get_project_errors`, and the evidence one-liners. These are not stylistic scaffolding — they encode consequences the model cannot infer from the code in front of it.
 - When you brief a subagent, give intent plus constraints plus scope, and skip the micro-steps (`content/rules/subagents.md → Bounded sidecar task templates`).
 
 ## 4. Ground every progress claim in evidence
 
 On long autonomous runs, unaudited status reports are the main failure mode this model has to be steered away from.
 
-- Before reporting progress or delivery, **audit each claim against an actual tool result from this session**. "Проверено", "тесты прошли", "синтаксис чистый", "шаблон использован" require the corresponding output — `syntaxcheck` / `check_1c_code` / `review_1c_code` / `verify_xml` results, the `templatesearch` hit, the `recall` notes, the Designer log line.
+- Before reporting progress or delivery, **audit each claim against an actual tool result from this session**. "Проверено", "тесты прошли", "синтаксис чистый", "шаблон использован" require the corresponding output — `revalidate_objects`/`validate_query` / `get_project_errors` / `get_check_description`/`get_problem_summary` / `revalidate_objects` + `get_project_errors` results, the `templatesearch` hit, the `recall` notes, the Designer log line.
 - Report outcomes faithfully: if a validator failed, say so and quote the finding; if a step was skipped, say which and why; when something is verified, state it plainly without hedging. Unverified is a status you report, not a gap you paper over (`AGENTS.md → MCP Tool Calling → B.1`).
 - This is the same obligation the ruleset already carries in `content/rules/verification-delivery.md`; on this model, state it in the answer explicitly rather than assuming it is visible.
 

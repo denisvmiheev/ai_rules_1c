@@ -36,15 +36,15 @@ Canonical content: [`verification-policy.md`](verification-policy.md).
 
 Canonical content: [`verification-gates.md`](verification-gates.md).
 
-### Gate 1 — Syntax (`syntaxcheck`)
+### Gate 1 — Syntax (`revalidate_objects`/`validate_query`)
 
 See [`verification-gates.md`](verification-gates.md).
 
-### Gate 2 — Logic & performance (`check_1c_code`)
+### Gate 2 — Logic & performance (`get_project_errors`)
 
 See [`verification-gates.md`](verification-gates.md).
 
-### Gate 3 — Style & ITS compliance (`review_1c_code`)
+### Gate 3 — Style & ITS compliance (`get_check_description`/`get_problem_summary`)
 
 See [`verification-gates.md`](verification-gates.md).
 

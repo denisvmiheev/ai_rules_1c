@@ -94,7 +94,7 @@ The plan must satisfy these acceptance criteria before stage 3:
 
 - Each task is **one coherent unit of work** that an enthusiastic junior 1C developer with no project context can execute: a procedure / function, an event handler, a form, a register, or a coherent group of related edits within one module. Do not shred the plan into ≤20-line fragments — over-fragmentation multiplies verification points and handoffs without adding safety.
 - Each task names exact file paths and exact procedure names — no "update the related modules".
-- Verification points are attached per module / coherent group (`syntaxcheck`, an MCP query, an assertion, a manual reproduction) — not per every few lines.
+- Verification points are attached per module / coherent group (`revalidate_objects`/`validate_query`, an MCP query, an assertion, a manual reproduction) — not per every few lines.
 - Risks and rollback are explicit, especially for metadata changes (UUID stability, register movements, role grants).
 - The plan is approved — see the approval gate below.
 
@@ -125,7 +125,7 @@ The implementation subagent is responsible for:
 
 - editing the BSL / XML;
 - running the ordered validator chain on every touched module:
-  `syntaxcheck` → `check_1c_code` → `review_1c_code`;
+  `revalidate_objects`/`validate_query` → `get_project_errors` → `get_check_description`/`get_problem_summary`;
 - recording per-artifact validator results and run counts after the final edit so Stage 5 can
   reuse them without duplicate calls;
 - preserving module headers, regions and the project's code style (`dev-standards-code-style.md`);
@@ -211,7 +211,7 @@ When the user asks for a review, the subagent looks at:
 
 - anti-patterns from `anti-patterns.md` and `platform-solutions.md`;
 - ITS standards via `v8std_search` / `v8std_explain_diagnostics` on `v8std-local` (or `its_help` → `fetch_its` if the project runs `1c-code-check-mcp` instead);
-- BSL LS warnings via `review_1c_code`;
+- BSL LS warnings via `get_check_description`/`get_problem_summary`;
 - query patterns, transactional safety, lock granularity, posting boundaries.
 
 The subagent reports issues by severity (critical / major / minor). Critical issues block delivery; minor issues are informational.

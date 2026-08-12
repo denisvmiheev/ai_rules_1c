@@ -97,5 +97,5 @@ The PowerShell scripts under `tools/1c-interface-manage/scripts/` were refreshed
 
 ## MCP Integration
 
-- **metadatasearch** — Verify command and subsystem names referenced in the interface configuration.
+- **get_metadata_objects** — Verify command and subsystem names referenced in the interface configuration.
 - **get_metadata_details** — Get object structure for verifying command targets.

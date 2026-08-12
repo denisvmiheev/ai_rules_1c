@@ -29,7 +29,7 @@ OpenSpec artifacts (`proposal.md`, `design.md`, `tasks.md`, delta and current sp
 Classify the change before any pre-author MCP call — evidence depth depends on the class; applying the full evidence set to a one-button change is the most common source of context bloat.
 
 - **quick-spec** — touches **one** existing metadata object plus, optionally, 1-3 independent isolated additions (a constant, a data processor / settings form, an independent information register with no module). No new documents / accumulation or accounting registers / roles / event subscriptions / scheduled jobs; no changes to existing transactional paths, RLS conditions, posting code, or public common-module signatures; naming of new objects is the only architecturally novel decision.
-  *Evidence minimum:* targeted attribute check (`resolve_qualified_name` or a `search_metadata` JSON template — check 2 below) **plus** one `ssl_search` if the spec relies on a БСП subsystem **plus** `recall` only if the change keywords overlap prior project work. `Context sources` block — one line.
+  *Evidence minimum:* targeted attribute check (`get_metadata_details` on the object FQN, or `get_metadata_objects` to locate it — check 2 below) **plus** one `ssl_search` if the spec relies on a БСП subsystem **plus** `recall` only if the change keywords overlap prior project work. `Context sources` block — one line.
 - **full-spec** — everything else: new transactional code paths, new registers / documents / roles, modified posting or write paths, public API signatures, БСП integrations beyond a single known API, cross-module impact, performance NFRs, security / PII handling. Run the full pre-author checks below.
 
 When in doubt — quick-spec wins until the second novel architectural decision shows up; then promote to full-spec.
@@ -39,10 +39,10 @@ When in doubt — quick-spec wins until the second novel architectural decision 
 Run **before** writing the artifact, under `AGENTS.md → MCP Tool Calling → C` (no duplication, no blind chaining, no defensive calls). **The presumption is in favour of skipping** — include a check only when it materially closes a gap that affects a concrete `### Requirement:`. Per `AGENTS.md → A.3`, the `Context sources` block briefly notes (one short sentence) any check that was normally relevant for the change class but deliberately skipped; out-of-class checks need no mention.
 
 1. **Project memory — `recall`** (`1c-templates-fastcode`) — when the change keywords overlap anything already touched in the project: existing object names, known subsystems, recurring error messages, prior decisions on the same domain. Greenfield topics: optional; a short "`recall` skipped: greenfield topic" note is enough.
-2. **Metadata facts — narrowest query first.** Single attribute / column existence and type — `resolve_qualified_name "Документ.<Name>.Реквизит.<Attr>"` or `search_metadata {"operation": "get_attribute_type", ...}` (by far the most common case). Lists of attributes / tabular parts / dimensions / resources / forms — `search_metadata` JSON templates (`list_attributes`, `object_structure`, `list_enum_values`, …): deterministic, much smaller payload than a dossier. Multi-facet passport — `get_object_dossier` with a `sections` filter; the all-sections default is a last resort. On empty / non-actionable results — fallback chain per `AGENTS.md → A.4`. Never invent attribute names from analogous documents or from memory.
+2. **Metadata facts — narrowest query first.** Single attribute / column existence and type — `get_metadata_details` on the fully qualified name (`Документ.<Name>.Реквизит.<Attr>`; by far the most common case). Lists of attributes / tabular parts / dimensions / resources / forms — `get_metadata_details` on the owner FQN with a `sections` / field filter: deterministic and much smaller than the all-sections default, which is a last resort. Locating an object by name or category — `get_metadata_objects` (`nameFilter`, `metadataType`, `names_only`). Check the live tool schema for the available filters before calling (`AGENTS.md → MCP Tool Calling → C.5`). On empty / non-actionable results — fallback chain per `AGENTS.md → A.4`. Never invent attribute names from analogous documents or from memory.
 3. **Platform APIs — `docinfo` / `docsearch` (`1c-platform-mcp`), ITS `v8std_search` / `v8std_explain_diagnostics` (`v8std-local`), or `its_help` → `fetch_its` on `1c-code-check-mcp` if that server is used instead.** Verify the exact name, signature, and version availability against the project's `CompatibilityMode` for every platform type / method the spec is normative about. Skip for hrestomatic APIs whose shape is fixed across supported versions when the spec does not pin a signature.
 4. **БСП / SSL — `ssl_search` (`1c-ssl-mcp`).** When the spec mentions a БСП subsystem: confirm it exists in this project's БСП version, its real name in this configuration, and which public API / hook to call. **Required without exception** when the change stores secrets / tokens / API keys (confirm `БезопасноеХранилище`) or touches personal data (confirm `ЗащитаПерсональныхДанных`).
-5. **Project source patterns — `search_code` / `codesearch` / `search_function`.** When the spec proposes a new module, function, or pattern — align naming, signature, and placement with an existing analog. Skip when genuinely first-of-its-kind.
+5. **Project source patterns — `search_in_code` / `get_module_structure`.** When the spec proposes a new module, function, or pattern — align naming, signature, and placement with an existing analog. Skip when genuinely first-of-its-kind.
 
 **Stop criterion.** As soon as every `### Requirement:` can be written with concrete object, attribute, БСП, and platform names — no `<TBD>`, no "to clarify" — stop calling MCP and start writing. Additional calls only when a specific gap surfaces during drafting; repeating a check "just to be safe" violates `AGENTS.md → C.1`.
 
@@ -52,7 +52,7 @@ Run **before** writing the artifact, under `AGENTS.md → MCP Tool Calling → C
 - **Invented metadata or attribute names** — nothing lands without metadata confirmation.
 - **Platform-API signatures written from memory** where the spec is normative — cite the verified source.
 - **Cross-version assumptions without a `CompatibilityMode` check** — if the spec assumes 8.3.21+ behaviour (async HTTP, `Ждать`, OpenSSL, structured logging), confirm the target version or scope the spec to the version in force.
-- **Defensive MCP calls without a concrete gap** — a dossier "for completeness" when one `resolve_qualified_name` closes the only open question is the same defect as a missing call.
+- **Defensive MCP calls without a concrete gap** — a full all-sections `get_metadata_details` "for completeness" when one filtered call closes the only open question is the same defect as a missing call.
 
 ### Context sources block — compact, evidence-only
 
@@ -67,7 +67,7 @@ Verified via MCP: `Документы.НачислениеЗарплаты.Ко�
 
 Multi-line form — only when more than 5 confirmations are listed or one confirmation needs a comment (version incompatibility, deliberate scoping); group by what was confirmed, not by which tool returned it.
 
-A missing block on a non-trivial spec is a defect, the same way a missing `syntaxcheck` run is a defect for BSL; bloating it with skipped-tool noise is the opposite defect.
+A missing block on a non-trivial spec is a defect, the same way a missing `revalidate_objects`/`validate_query` run is a defect for BSL; bloating it with skipped-tool noise is the opposite defect.
 
 ### Subagent obligations
 
@@ -91,7 +91,7 @@ The upstream OpenSpec default "prefer making reasonable decisions to keep moment
 
 - **Architecturally meaningful and ambiguous — ask the user now.** Meaningful = the choice changes `design.md → ## Architecture decisions`, the shape of a delta requirement, a public export signature, placement (main configuration vs extension), secrets / settings storage, transactional boundaries, error-handling pattern, logging strategy, the БСП subsystem, or the platform-version target. Ask via the `CONFUSION` format from `AGENTS.md → Development Procedure → 1. Think Before Coding` — options with trade-offs, no prose paraphrase.
 - **A default the user is unlikely to care about — pin it in `design.md` with a one-line rationale and proceed** (cache policy without an NFR, a private helper name, an internal module split).
-- **Depends on a 1C fact — make the MCP call, do not ask.** The user is not a substitute for `resolve_qualified_name` / `search_metadata` / `ssl_search` / `recall`.
+- **Depends on a 1C fact — make the MCP call, do not ask.** The user is not a substitute for `get_metadata_details` / `get_metadata_objects` / `ssl_search` / `recall`.
 
 ### Pre-finalization clarification gate
 

@@ -99,7 +99,7 @@ If a criterion cannot be met, say so explicitly in the report — do not present
 
 ## Validators
 
-| Artifact | syntaxcheck | check_1c_code | review_1c_code |
+| Artifact | revalidate_objects/validate_query | get_project_errors | get_check_description/get_problem_summary |
 |----------|-------------|---------------|----------------|
 | `path/Module.bsl` | [result, N runs] | [result, N runs] | [result, N runs] |
 

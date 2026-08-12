@@ -49,7 +49,7 @@ See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1
 
 ```
 a) Run syntax check
-   - Use syntaxcheck tool
+   - Use revalidate_objects/validate_query tool
    - Capture ALL errors, not just first
 
 b) Categorize errors by type
@@ -84,7 +84,7 @@ For each error:
 4. Iterate until working
 
 5. Close the chain before delivery
-   - Run syntaxcheck → check_1c_code → review_1c_code on every
+   - Run revalidate_objects/validate_query → get_project_errors → get_check_description/get_problem_summary on every
      touched module (budget: AGENTS.md → B.1)
    - If a validator is not exposed — graceful degradation per
      verification-checklist.md; record the skip in the report
@@ -97,7 +97,7 @@ For each error:
 | Syntax error | Fix exact syntax issue |
 | Undefined variable | Add declaration or fix typo |
 | Unknown method | Verify via docsearch, fix name |
-| Unknown metadata | Verify via metadatasearch, fix name |
+| Unknown metadata | Verify via get_metadata_objects, fix name |
 | Type mismatch | Convert to correct type |
 | Missing parameter | Add required parameters |
 | Deprecated API | Replace with recommended alternative |
@@ -160,7 +160,7 @@ If you notice a real defect orthogonal to the assigned errors — report it to t
 
 ## Verification
 
-- [ ] syntaxcheck → check_1c_code → review_1c_code pass on every touched module (budget B.1)
+- [ ] revalidate_objects/validate_query → get_project_errors → get_check_description/get_problem_summary pass on every touched module (budget B.1)
 - [ ] No new errors introduced
 - [ ] Minimal lines changed
 ```

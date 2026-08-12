@@ -57,8 +57,8 @@ The parent specifies the thoroughness level in the task. If unspecified, assume 
 | Level | Budget | Approach |
 |-------|--------|----------|
 | **quick** | 1–3 MCP calls | Single targeted lookup. Good for "where is procedure X" or "does object Y exist". One-paragraph answer. |
-| **medium** | 4–10 MCP calls | One pass through the relevant tools (dossier + 1–2 code/usage searches + brief structure read). Default. |
-| **thorough** | 10–25 MCP calls | Multi-angle exploration: dossier(s) + impact/call-chain analysis + canonical templates + SSL check + cross-references. Used before refactoring or large feature work. |
+| **medium** | 4–10 MCP calls | One pass through the relevant tools (`get_metadata_details` + 1–2 code/usage searches + brief structure read). Default. |
+| **thorough** | 10–25 MCP calls | Multi-angle exploration: `get_metadata_details` + impact/call-chain analysis + canonical templates + SSL check + cross-references. Used before refactoring or large feature work. |
 
 Stop as soon as the question is answered with verified evidence. Do not pad.
 

@@ -24,7 +24,7 @@ After any code edit, perform an internal review scaled to the path: quick-fix �
 
 ## Code Reuse
 
-Before writing new code — check common and manager modules for an existing export method that can be reused. Use `search_function`, `ssl_search`, `templatesearch`, and `codesearch` **before** writing.
+Before writing new code — check common and manager modules for an existing export method that can be reused. Use `get_module_structure`, `ssl_search`, `templatesearch`, and `search_in_code` **before** writing.
 
 **Templates:** when `templatesearch` returns a fitting template — **use it as the starting point**; adapt names/filters/placement only (`AGENTS.md → A.9`, `1c-templates-fastcode.md → Using a found template`). Do not rewrite the same solution from scratch.
 
@@ -51,7 +51,7 @@ Do not preload the whole set "to be safe" — follow the router.
 
 Entry point — `query-design.md` (load first for any non-trivial query task). Authoritative formatting and hard bans — `dev-standards-architecture.md §3 → "Queries"`. Headlines:
 
-- Verify metadata before writing a query (`metadatasearch` / `get_metadata_details`).
+- Verify metadata before writing a query (`get_metadata_objects` / `get_metadata_details`).
 - No queries inside loops — use batch queries with temporary tables (`ВТ_*`).
 - Always parameterize (`Запрос.УстановитьПараметр()`), never concatenate strings.
 - Always use `КАК` aliases. Use `ПЕРВЫЕ N` when only a subset is needed.

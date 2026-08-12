@@ -405,9 +405,9 @@ No script files were brought into `tools/` — the operations are pure module-te
 ## MCP Integration
 
 - **ssl_search** — Find SSL module methods for BSP registration and verify correct API method names.
-- **metadatasearch** — Verify target metadata object names.
+- **get_metadata_objects** — Verify target metadata object names.
 - **get_metadata_details** — Get full structure of target objects for registration.
-- **codesearch** — Find existing handler patterns in the codebase.
+- **search_in_code** — Find existing handler patterns in the codebase.
 
 ## SDD Integration
 

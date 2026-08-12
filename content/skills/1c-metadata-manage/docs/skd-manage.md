@@ -454,13 +454,12 @@ The PowerShell scripts under `tools/1c-skd-{compile,edit,info,validate}/scripts/
 
 ## MCP Integration
 
-- **get_object_dossier** — Comprehensive structural passport of the object for DCS data set fields: attributes, tabular parts, dimensions, resources, and their types in one call.
-- **metadatasearch** — Verify object and attribute names used in queries; cross-reference field names with actual metadata objects.
-- **get_metadata_details** — Get exact attribute types and tabular part structure for objects used in DCS data sets.
-- **search_code** — Find existing BSL code that builds DCS queries or modifies DCS programmatically (prefer over Grep; supports semantic/fulltext/hybrid search).
-- **metadatasearch** (`names_only=true`) — Find similar metadata objects for DCS schema XML reference.
-- **get_xsd_schema** — Get XSD schema for DCS XML (`object_type="СКД"`). Use before generating schema XML.
-- **verify_xml** — Validate generated DCS XML against XSD. Always validate before committing.
+- **get_metadata_details** — Comprehensive structural passport of the object for DCS data set fields: attributes, tabular parts, dimensions, resources, and their types in one call.
+- **get_metadata_objects** — Verify object and attribute names used in queries; cross-reference field names with actual metadata objects.
+- **search_in_code** — Find existing BSL code that builds DCS queries or modifies DCS settings programmatically (literal or regex, narrowed by `fileMask` / `metadataType`).
+- **get_metadata_objects** (`names_only=true`) — Find similar metadata objects for DCS schema XML reference.
+- **get_xsd_schema** — Get XSD schema for DCS XML (`object_type="СКД"`). Use before generating schema XML. *(classic distribution only — no `edt-mcp` equivalent.)*
+- **revalidate_objects** + **get_project_errors** — Validate the changed objects through EDT's own model validation (there is no XSD/raw-XML validator on `edt-mcp`; the classic distribution used `verify_xml`). Always validate before committing.
 - **templatesearch** — Find similar DCS patterns in the codebase.
 - **docsearch** — Look up valid DCS element types and properties when investigating validation errors; DCS platform documentation.
 

@@ -105,7 +105,7 @@ The script refuses a real deletion without `-Force`. It parses and serializes th
 
 ## MCP Integration
 
-- **metadatasearch** — Verify the parent object exists and supports templates.
+- **get_metadata_objects** — Verify the parent object exists and supports templates.
 - **get_metadata_details** — Get parent object structure to confirm template compatibility.
 - **templatesearch** — Find similar template implementations.
 

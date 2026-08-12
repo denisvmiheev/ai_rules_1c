@@ -222,16 +222,13 @@ An extension is the **default answer** when a typical object on vendor support n
 
 ## MCP Integration
 
-- **get_object_dossier** — Comprehensive structural passport of the base object before borrowing (structure, forms, dependencies, code modules, roles).
-- **metadatasearch** — Find objects to borrow and verify module paths.
-- **get_metadata_details** — Get full object structure for objects being borrowed.
-- **search_code** — Find methods to intercept (prefer over `codesearch`; supports semantic/fulltext/hybrid search with detail levels L0–L3).
-- **codesearch** — Find methods in raw BSL files (fallback when `search_code` is not available).
-- **metadatasearch** (`names_only=true`) — Find similar metadata objects for extension XML reference.
-- **compare_base_and_extension** — Structural diff between base and extension after borrowing: attributes, forms, and routines added/overridden/unchanged.
-- **trace_impact** — Recursive impact analysis of extension changes on the base configuration (preferred over `graph_dependencies` for deep dependency chains).
-- **graph_dependencies** — Flat dependency overview before borrowing.
-- **syntaxcheck** — Verify generated BSL code.
+- **get_metadata_details** — Comprehensive structural passport of the base object before borrowing (structure, forms, dependencies, code modules, roles).
+- **get_metadata_objects** — Find objects to borrow and verify module paths.
+- **search_in_code** — Find methods to intercept (literal or regex, narrowed by `fileMask` / `metadataType`; `outputMode=files` for a compact hit list).
+- **get_metadata_objects** (`names_only=true`) — Find similar metadata objects for extension XML reference.
+- **compare_base_and_extension** — Structural diff between base and extension after borrowing: attributes, forms, and routines added/overridden/unchanged. *(classic distribution only — no `edt-mcp` equivalent.)*
+- **find_references** + **get_method_call_hierarchy** — Impact of extension changes on the base configuration: object-level references and BSL call chains (the classic distribution's recursive `trace_impact` / `graph_dependencies` have no single-tool equivalent).
+- **revalidate_objects/validate_query** — Verify generated BSL code.
 
 ## SDD Integration
 

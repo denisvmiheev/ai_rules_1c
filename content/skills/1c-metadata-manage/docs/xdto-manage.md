@@ -219,7 +219,7 @@ powershell.exe -NoProfile -File skills/1c-metadata-manage/tools/1c-xdto-manage/s
 ## MCP Integration
 
 - **docsearch** — platform documentation on `ФабрикаXDTO`, XDTO objects and serialization.
-- **metadatasearch** — check whether the configuration already has a package for the exchange in question before building a new one.
+- **get_metadata_objects** — check whether the configuration already has a package for the exchange in question before building a new one.
 
 ## SDD Integration
 

@@ -356,10 +356,10 @@ The compile/decompile/info scripts (`mxl-compile`, `mxl-decompile`, `mxl-info`) 
 
 ## MCP Integration
 
-- **metadatasearch** — Verify object names used in parameters; find template paths in the configuration.
+- **get_metadata_objects** — Verify object names used in parameters; find template paths in the configuration.
 - **get_metadata_details** — Get attribute types for objects whose data will populate the layout.
-- **get_xsd_schema** — Get XSD schema for layout XML (`object_type="Макет"`). Use before generating MXL XML.
-- **verify_xml** — Validate generated layout XML against XSD.
+- **get_xsd_schema** — Get XSD schema for layout XML (`object_type="Макет"`). Use before generating MXL XML. *(classic distribution only — no `edt-mcp` equivalent.)*
+- **revalidate_objects** + **get_project_errors** — Validate the changed objects through EDT's own model validation (there is no XSD/raw-XML validator on `edt-mcp`; the classic distribution used `verify_xml`). Always validate before committing.
 - **templatesearch** — Find existing layout examples in the codebase.
 
 ## SDD Integration

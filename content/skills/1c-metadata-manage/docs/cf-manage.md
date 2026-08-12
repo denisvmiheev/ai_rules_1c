@@ -136,13 +136,12 @@ The PowerShell scripts under `tools/1c-cf-manage/scripts/` were refreshed from [
 
 ## MCP Integration
 
-- **get_object_dossier** — Comprehensive structural passport of existing configuration objects (structure, forms, dependencies, code, roles) in one call.
-- **metadatasearch** — Explore existing configuration structure, verify object names.
-- **get_metadata_details** — Get full object structure for existing configuration objects.
-- **metadatasearch** (`names_only=true`) — Find similar configuration objects as XML reference examples.
-- **get_xsd_schema** — Get XSD schema for configuration XML. Use before generating Configuration.xml.
-- **verify_xml** — Validate generated configuration XML against XSD.
-- **compare_base_and_extension** — Compare configuration objects with their extension counterparts when working with configurations that have extensions.
+- **get_metadata_details** — Comprehensive structural passport of existing configuration objects (structure, forms, dependencies, code, roles) in one call.
+- **get_metadata_objects** — Explore existing configuration structure, verify object names.
+- **get_metadata_objects** (`names_only=true`) — Find similar configuration objects as XML reference examples.
+- **get_xsd_schema** — Get XSD schema for configuration XML. Use before generating Configuration.xml. *(classic distribution only — no `edt-mcp` equivalent.)*
+- **revalidate_objects** + **get_project_errors** — Validate the changed objects through EDT's own model validation (there is no XSD/raw-XML validator on `edt-mcp`; the classic distribution used `verify_xml`). Always validate before committing.
+- **compare_base_and_extension** — Compare configuration objects with their extension counterparts when working with configurations that have extensions. *(classic distribution only — no `edt-mcp` equivalent.)*
 - **docsearch** — Platform documentation on configuration properties.
 
 ## SDD Integration

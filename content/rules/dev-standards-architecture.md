@@ -146,7 +146,7 @@ Visual form editing in extensions — **minimize**. Changes — programmatically
 
 ### Queries
 - Verify metadata attributes (existence, names, types) **before** writing a query — see `AGENTS.md → MCP Tool Calling` (rule #3 «verify before writing»; metadata-first via `get_metadata_details` / `get_metadata_objects`).
-- Look for existing query examples before writing complex queries (`templatesearch`, `search_code`).
+- Look for existing query examples before writing complex queries (`templatesearch`, `search_in_code`).
 - Query text formatting — on a new line at the same indentation level as the variable declaration:
 
 ```bsl

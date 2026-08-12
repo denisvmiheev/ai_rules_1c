@@ -65,7 +65,7 @@ b) Categorize by risk level:
 ### 2. Risk Assessment
 
 For each item to refactor:
-- Check all usages via `codesearch`
+- Check all usages via `search_in_code`
 - Verify no dynamic calls (string-based calls)
 - Check if part of public interface
 - Review dependencies
@@ -129,14 +129,14 @@ Follow the form-module guidelines from `content/rules/form-module.md` and `conte
 ## Safety Checklist
 
 Before removing ANYTHING:
-- [ ] Search all references via `codesearch`
+- [ ] Search all references via `search_in_code`
 - [ ] Check for dynamic/string-based calls
 - [ ] Verify not part of public API
 - [ ] Review dependent code
 - [ ] Test affected functionality
 
 After each change:
-- [ ] Validator chain passes on every touched module — `syntaxcheck` → `check_1c_code` → `review_1c_code`; a blocking defect has a clean confirming run within the budget from `AGENTS.md → MCP Tool Calling → B.1`; if a validator is not exposed — graceful degradation per `content/rules/verification-checklist.md`, record the skip in the report
+- [ ] Validator chain passes on every touched module — `revalidate_objects`/`validate_query` → `get_project_errors` → `get_check_description`/`get_problem_summary`; a blocking defect has a clean confirming run within the budget from `AGENTS.md → MCP Tool Calling → B.1`; if a validator is not exposed — graceful degradation per `content/rules/verification-checklist.md`, record the skip in the report
 - [ ] No new errors introduced
 - [ ] Related tests still work
 - [ ] Document the change
@@ -178,7 +178,7 @@ After each change:
 
 ## Testing
 
-- [ ] Validator chain passed (syntaxcheck → check_1c_code → review_1c_code)
+- [ ] Validator chain passed (revalidate_objects/validate_query → get_project_errors → get_check_description/get_problem_summary)
 - [ ] Functionality verified
 - [ ] Performance tested
 - [ ] No regressions found

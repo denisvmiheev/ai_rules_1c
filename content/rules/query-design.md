@@ -25,8 +25,8 @@ Each companion is self-contained — load only the ones that match the task. Do 
 
 ## Pre-flight (every non-trivial query)
 
-1. **Verify metadata** before the first `ВЫБРАТЬ` — `metadatasearch` / `get_metadata_details` / `get_object_dossier`. Do not invent attribute or tabular-section names.
-2. **Find a proven shape** — `templatesearch` / `codesearch` / `search_code` before inventing a new skeleton. **`templatesearch` only** (`AGENTS.md → A.8` + **A.9**): pre-flight + task verbatim; **if template matches — use it, adapt only what's needed** (`1c-templates-fastcode.md → Using a found template`). `codesearch` / `search_code` keep their own query register.
+1. **Verify metadata** before the first `ВЫБРАТЬ` — `get_metadata_objects` / `get_metadata_details`. Do not invent attribute or tabular-section names.
+2. **Find a proven shape** — `templatesearch` / `search_in_code` before inventing a new skeleton. **`templatesearch` only** (`AGENTS.md → A.8` + **A.9**): pre-flight + task verbatim; **if template matches — use it, adapt only what's needed** (`1c-templates-fastcode.md → Using a found template`). `search_in_code` keep their own query register.
 3. **Pick the right source** — catalog / document / information-register slice / accumulation virtual table (`Остатки`, `Обороты`, `ОстаткиИОбороты`). Wrong source is a design defect, not a tuning problem.
 4. **Apply hard bans** from `dev-standards-architecture.md §3` — no queries in loops, always parameterize, always `КАК`, filter virtual tables by parameters (not `ГДЕ`), intermediate variable for `Запрос.Выполнить()`.
 5. **Temp-table / union checklist** — for every multi-batch query, before delivery: each temp table later used in a `СОЕДИНЕНИЕ` / `ОБЪЕДИНИТЬ` / `В (ВЫБРАТЬ …)` has `ИНДЕКСИРОВАТЬ ПО` on its join keys (2–3 most selective fields, not the full list); no `РАЗЛИЧНЫЕ` inside `ОБЪЕДИНИТЬ` operands or on top of `СГРУППИРОВАТЬ ПО`; correlated subqueries replaced by an indexed temp table + join; virtual-table periodicity matches the join keys. Canon — `dev-standards-architecture.md §3` (hard rules) + `query-optimization.md → Mandatory Optimization Checklist`.

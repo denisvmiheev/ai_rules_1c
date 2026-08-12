@@ -38,7 +38,7 @@ See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1
 
 After every edit run the full chain in order — `revalidate_objects/validate_query` → `get_project_errors` → `get_check_description/get_problem_summary` — within the budget from `AGENTS.md → MCP Tool Calling → B.1`; a blocking defect requires a clean confirming run on the changed state. If a validator is not exposed in the session — graceful degradation per `content/rules/verification-gates.md`; record the skip in the report.
 
-After every edit run the full chain in order — `syntaxcheck` → `check_1c_code` → `review_1c_code` — within the budget from `AGENTS.md → MCP Tool Calling → B.1`; a blocking defect requires a clean confirming run on the changed state. If a validator is not exposed in the session — graceful degradation per `content/rules/verification-gates.md`; record the skip in the report.
+After every edit run the full chain in order — `revalidate_objects`/`validate_query` → `get_project_errors` → `get_check_description`/`get_problem_summary` — within the budget from `AGENTS.md → MCP Tool Calling → B.1`; a blocking defect requires a clean confirming run on the changed state. If a validator is not exposed in the session — graceful degradation per `content/rules/verification-gates.md`; record the skip in the report.
 
 **SDD Integration:** If the project has an `openspec/` workspace, read `content/rules/sdd-integrations.md` for OpenSpec integration guidance.
 
@@ -101,7 +101,7 @@ For each fix:
 1. Verify current behavior
 2. Apply minimal change to fix performance
 3. Verify functionality preserved
-4. Run the validator chain (`syntaxcheck` → `check_1c_code` → `review_1c_code`, budget B.1) on the touched module
+4. Run the validator chain (`revalidate_objects`/`validate_query` → `get_project_errors` → `get_check_description`/`get_problem_summary`, budget B.1) on the touched module
 5. Document performance improvement
 
 If you notice a real defect orthogonal to the performance task — report it to the parent agent in the final report; do not fix it within this task (`content/rules/subagent-pipeline.md → Stage 3`).
@@ -112,9 +112,9 @@ Before reporting, verify all of the following. For non-trivial changes also appl
 
 - [ ] Every assigned optimization is implemented; nothing was silently skipped or replaced
 - [ ] No file outside the assigned scope was edited; no "while we're here" changes
-- [ ] `syntaxcheck` → `check_1c_code` → `review_1c_code` pass on every touched module (budget B.1); substantive findings fixed
+- [ ] `revalidate_objects`/`validate_query` → `get_project_errors` → `get_check_description`/`get_problem_summary` pass on every touched module (budget B.1); substantive findings fixed
 - [ ] Observable behaviour is unchanged — only performance characteristics improved
-- [ ] Impact was considered when a public export or query shape changed (`trace_call_chain` for routine callers; `trace_impact` / `graph_dependencies` for object dependencies)
+- [ ] Impact was considered when a public export or query shape changed (`get_method_call_hierarchy` for routine callers; `find_references` / `find_references` for object dependencies)
 
 If a criterion cannot be met, say so explicitly in the report — do not present a partial result as complete.
 

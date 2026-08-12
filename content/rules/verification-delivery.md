@@ -66,8 +66,8 @@ Do not include in the delivery summary:
 
 ## Anti-patterns
 
-- **Skipping Gate 1** "because the edit was tiny" — `syntaxcheck` is the cheapest gate; skipping it never saves time.
-- **Running gates in the wrong order** — running `check_1c_code` before `syntaxcheck` wastes the AI checker on syntax-broken code.
-- **Looping on AI non-determinism** — if `check_1c_code` returns different items each run on the **same** code, take the strictest set and stop. Do not burn the 3-call budget on noise.
+- **Skipping Gate 1** "because the edit was tiny" — `revalidate_objects`/`validate_query` is the cheapest gate; skipping it never saves time.
+- **Running gates in the wrong order** — running `get_project_errors` before `revalidate_objects`/`validate_query` wastes the AI checker on syntax-broken code.
+- **Looping on AI non-determinism** — if `get_project_errors` returns different items each run on the **same** code, take the strictest set and stop. Do not burn the 3-call budget on noise.
 - **Marking the task done** with un-removed `Debug.*` log entries or temporary `ПоказатьЗначение` calls — soft gate A failure.
 - **Auto-running `1c-code-reviewer`** when the user did not ask — soft gate C failure, and a direct violation of `subagents.md`.

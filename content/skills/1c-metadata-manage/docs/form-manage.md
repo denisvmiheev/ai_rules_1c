@@ -875,13 +875,12 @@ In addition to the form-compile / form-info / form-add / form-edit / form-remove
 
 ## MCP Integration
 
-- **get_object_dossier** — Comprehensive structural passport of the metadata object including all its forms, attributes, dependencies, and code in one call. Use as the first step before form design.
+- **get_metadata_details** — Comprehensive structural passport of the metadata object including all its forms, attributes, dependencies, and code in one call. Use as the first step before form design.
 - **search_forms** — Find similar existing forms in the configuration by object name, form name, or title. Use as a starting point for new form design.
 - **inspect_form_layout** — Get full form structure: element hierarchy with types and data bindings, form attributes, commands, event handlers, visibility, accessibility. Use to study existing forms before creating or modifying.
-- **metadatasearch** — Verify metadata object existence and structure before creating forms; verify object types, attribute names, and metadata types when defining attributes. Use `names_only=true` to get compact object lists.
-- **get_metadata_details** — Get full attribute types, tabular parts, synonyms for the metadata object the form belongs to.
-- **get_xsd_schema** — Get XSD schema for form XML (`object_type="Форма"`). Use before generating or modifying Form.xml to know valid structure.
-- **verify_xml** — Validate generated or modified Form.xml against XSD (`object_type="Форма"`). Always validate before committing.
+- **get_metadata_objects** — Verify metadata object existence and structure before creating forms; verify object types, attribute names, and metadata types when defining attributes. Use `names_only=true` to get compact object lists.
+- **get_xsd_schema** — Get XSD schema for form XML (`object_type="Форма"`). Use before generating or modifying Form.xml to know valid structure. *(classic distribution only — no `edt-mcp` equivalent.)*
+- **revalidate_objects** + **get_project_errors** — Validate the changed objects through EDT's own model validation (there is no XSD/raw-XML validator on `edt-mcp`; the classic distribution used `verify_xml`). Always validate before committing.
 - **templatesearch** — Find real form examples in the codebase, similar form implementations, and patterns when designing forms.
 
 ## SDD Integration
