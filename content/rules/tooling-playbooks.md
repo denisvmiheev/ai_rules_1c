@@ -10,6 +10,8 @@ The MCP server catalog, fallback order (`edt-mcp` model-based search/navigation 
 
 > A project running the classic docker distribution instead of `edt-mcp` substitutes the corresponding tools per `content/skills/mcp-1c-tools/docs/edt-mcp.md`'s remap table (e.g. `search_in_code` → `codesearch`/`search_code`, `get_metadata_details` → `get_object_dossier`, `find_references`/`get_method_call_hierarchy` → `trace_impact`/`trace_call_chain`/`graph_dependencies`); the sequencing and evidence discipline below is unchanged.
 
+**EDT projects.** When `.dev.env` `USE_EDT=true`, these playbooks still apply — the additions (source-format check before metadata steps, EDT validation markers alongside the BSL validators, EDT-side DB update, form snapshots) live in `content/rules/edt-workflow.md`. Load it together with the playbook for the task.
+
 ## Minimum Evidence Matrix
 
 Use the smallest set that closes the real context gaps. Do not promote a task to a heavier path just to satisfy a generic checklist.
@@ -26,7 +28,7 @@ Use the smallest set that closes the real context gaps. Do not promote a task to
 
 Load `content/rules/coding-standards.md` first; for forms use `forms.md`, for non-trivial queries use `query-design.md`.
 
-0. **Platform-capability check** — mandatory when the task requires a specialized capability (cryptography / digital signatures, СЛАУ / numerical methods, data analysis / ML, collaboration system / bots, integration bus / message queues, full-text search, regular expressions, and similar): `docsearch` by capability description → `docinfo` for exact names found, plus `ssl_search` where a БСП solution is plausible — **before** designing a custom implementation. **If found and usable — build on the platform / БСП mechanism** (`AGENTS.md → A.7`, `1c-platform-mcp.md → Using a found platform mechanism`); do not hand-roll a parallel equivalent.
+0. **Platform-capability check** — mandatory when the task requires a specialized capability (cryptography / digital signatures, СЛАУ / numerical methods, data analysis / ML, collaboration system / bots, integration bus / message queues, full-text search, regular expressions, and similar): `docsearch` by capability description → `docinfo` for exact names found, plus `ssl_search` where a БСП solution is plausible — **before** designing a custom implementation. **If found and usable — build on the platform / БСП mechanism** (`AGENTS.md → A.7`, `1C-docs-mcp.md → Using a found platform mechanism`); do not hand-roll a parallel equivalent.
 1. **recall** (`1c-templates-fastcode`) — project-memory lookup with the task's key terms (object name, subsystem, error text) at the start of any non-trivial task, per `AGENTS.md → Project memory`. Skip for genuinely greenfield topics the project has never touched.
 2. **templatesearch** — **`templatesearch` only** (`AGENTS.md → A.8`): pre-flight in `1c-templates-fastcode.md → Query formulation (templatesearch only)`; pass user's task verbatim; keyword salad is a defect. **If a matching template is returned — use it as the base** (`AGENTS.md → A.9`, `1c-templates-fastcode.md → Using a found template`); adapt only what the task requires; do not rewrite from scratch.
 3. **get_metadata_details** — full passport of the target metadata object (structure, forms, dependencies, code, roles) in a single call.

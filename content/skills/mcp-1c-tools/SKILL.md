@@ -1,6 +1,6 @@
 ---
 name: mcp-1c-tools
-description: "Catalog of MCP servers for 1C development — search, code navigation, metadata, code review, docs, ITS, templates. Use whenever a 1C task requires calling tools from `edt-mcp`, `1c-ssl-mcp`, `1c-platform-mcp`, `1c-templates-fastcode`, or `v8std-local`. Each server has its own detail file under `docs/` — load it when you are about to call tools from that server, and only if the server is actually available in the current session."
+description: "Catalog of MCP servers for 1C development — search, code navigation, metadata, code review, docs, ITS, templates. Use whenever a 1C task requires calling tools from `edt-mcp`, `1c-ssl-mcp`, `1C-docs-mcp`, `1c-templates-fastcode`, or `v8std-local`. Each server has its own detail file under `docs/` — load it when you are about to call tools from that server, and only if the server is actually available in the current session."
 ---
 
 # MCP tools for 1C — dispatcher
@@ -25,7 +25,7 @@ If `docs/<server>.md` conflicts with the descriptor exposed by the current envir
 ## When to use this skill
 
 - Before writing code / a query / metadata XML — pick the MCP tool that best fits the task (template search, metadata check, diagnostics, analysis).
-- Before implementing a specialized capability (cryptography, СЛАУ / numerical methods, data analysis, collaboration system / bots, integration bus / queues, full-text search, regular expressions, …) — run the platform-capability check: `docsearch` → `docinfo` on `1c-platform-mcp` (+ `ssl_search` where a БСП solution is plausible). Do not trust model memory about what the platform does or does not have. Canon — `AGENTS.md → MCP Tool Calling → A.7`; procedure and trigger domains — [`docs/1c-platform-mcp.md`](docs/1c-platform-mcp.md) → *Platform capability discovery*.
+- Before implementing a specialized capability (cryptography, СЛАУ / numerical methods, data analysis, collaboration system / bots, integration bus / queues, full-text search, regular expressions, …) — run the platform-capability check: `docsearch` → `docinfo` on `1C-docs-mcp` (+ `ssl_search` where a БСП solution is plausible). Do not trust model memory about what the platform does or does not have. Canon — `AGENTS.md → MCP Tool Calling → A.7`; procedure and trigger domains — [`docs/1C-docs-mcp.md`](docs/1C-docs-mcp.md) → *Platform capability discovery*.
 - For impact analysis and code navigation — use `edt-mcp` (see *Fallback chain* below); fall back to `Grep` / `Glob` only after it misses or is not exposed.
 - For platform documentation (`docinfo` / `docsearch`) — platform-API facts, versioned behaviour.
 - For ITS standards and their linked diagnostics (`v8std_search` / `v8std_explain_diagnostics` / `v8std_explain_snippet` / `v8std_get_page` / `v8std_get_related` on `v8std-local`) — methodology / code-standard facts, and mapping an ACC/АПК/BSLLS/v8-code-style diagnostic to its ITS rationale. See `docs/v8std.md`.
@@ -42,7 +42,7 @@ This fork's default runs five MCP servers relevant to 1C development. `edt-mcp` 
 | **edt-mcp** | 1C:EDT MCP plugin: metadata discovery & typed mutation, BSL read/write & navigation, call hierarchy / impact analysis, EDT validation markers, forms rendering, debug & YAXUnit & profiling, infobases / DB update, event log, git branches, translation | [`docs/edt-mcp.md`](docs/edt-mcp.md) |
 | **1c-templates-fastcode** | Code template library + project vector memory (`remember` / `recall`) | [`docs/1c-templates-fastcode.md`](docs/1c-templates-fastcode.md) |
 | **1c-ssl-mcp** | Standard Subsystems Library (БСП / SSL) search | [`docs/1c-ssl-mcp.md`](docs/1c-ssl-mcp.md) |
-| **1c-platform-mcp** | 1C platform documentation (search by description / by exact name) | [`docs/1c-platform-mcp.md`](docs/1c-platform-mcp.md) |
+| **1C-docs-mcp** | 1C platform documentation (search by description / by exact name), routed project standards (`standards`), file-format specifications (`formatspec`) | [`docs/1C-docs-mcp.md`](docs/1C-docs-mcp.md) |
 | **v8std-local** | ITS "Стандарты разработки 1С" (v8std.ru mirror) — standards search, diagnostic-to-standard mapping (ACC/АПК, BSLLS, EDT, v8-code-style), snippet classification | [`docs/v8std.md`](docs/v8std.md) |
 
 ## Fallback chain (highest priority to lowest)
@@ -65,7 +65,7 @@ These servers have no `Grep` / `rg` equivalent; call them only when their knowle
 
 1. `1c-templates-fastcode` — code templates and project memory (`templatesearch`, `remember`, `recall`). **`templatesearch` only:** query pre-flight (`A.8`) + **reuse found template** (`A.9`, `docs/1c-templates-fastcode.md → Using a found template`).
 2. `1c-ssl-mcp` — БСП / SSL reusable APIs and patterns.
-3. `1c-platform-mcp` — versioned platform documentation; also the mandatory platform-capability check before hand-rolling a specialized mechanism (see `docs/1c-platform-mcp.md → Platform capability discovery`).
+3. `1C-docs-mcp` — versioned platform documentation; also the mandatory platform-capability check before hand-rolling a specialized mechanism (see `docs/1C-docs-mcp.md → Platform capability discovery`).
 4. `v8std-local` — ITS standards search and standard↔diagnostic mapping (`v8std_search` / `v8std_explain_diagnostics` / `v8std_explain_snippet` / `v8std_get_page` / `v8std_get_related`); see `docs/v8std.md`.
 5. `edt-mcp` — diagnostics-based analysis (`revalidate_objects`/`get_project_errors`/`get_check_description`) in place of a prose AI code review, which this fork's default set does not have (see `docs/edt-mcp.md → Coverage gaps`).
 
@@ -87,7 +87,7 @@ These servers have no `Grep` / `rg` equivalent; call them only when their knowle
 | Form structure / rendered layout / screenshot | `get_metadata_details` (form FQN) / `get_form_layout_snapshot` / `get_form_screenshot` |
 | Runtime error from the infobase | `get_event_log` (offline log-file read, no running session) |
 | Push configuration into the infobase | `list_configurations` / `get_applications` → `update_database` (preview → `confirm=true`) — via `/update1cbase` |
-| Platform documentation | `docsearch` / `docinfo` on `1c-platform-mcp` (or `get_platform_documentation` on `edt-mcp`, pinned to the project's platform version) |
+| Platform documentation | `docsearch` / `docinfo` on `1C-docs-mcp` (or `get_platform_documentation` on `edt-mcp`, pinned to the project's platform version) |
 | БСП / SSL reuse | `ssl_search` on `1c-ssl-mcp` |
 | Code templates | `templatesearch` on `1c-templates-fastcode` |
 | ITS standard behind a diagnostic (ACC/АПК, BSLLS, EDT, v8-code-style) | `v8std_explain_diagnostics` on `v8std-local` |

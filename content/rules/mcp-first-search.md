@@ -26,7 +26,9 @@ Applies to every subagent except `1c-explorer`, which already encodes the same r
 3. **Tune the query before re-calling.** If the first MCP call returned nothing, do **not** immediately fall through to the next tool — reformulate: broaden / narrow the query, or switch to a related tool covering the same ground from a different angle. Check the tool's live schema for available filters before assuming defaults are the only option — do not guess parameter names (`AGENTS.md → MCP Tool Calling → C.5`).
 4. **No-change repeats are forbidden.** Do not re-run the same MCP call against the same unchanged state. A new call must change parameters substantively, or the project state must have changed (file edit, new generation, resumed session).
 
-External-knowledge servers (`1c-templates-fastcode`, `1c-ssl-mcp`, `1c-platform-mcp`, `v8std-local`) have **no `Grep` / `rg` equivalent** — they are called only when their knowledge is needed, not as part of the fallback above. See `content/skills/mcp-1c-tools/docs/edt-mcp.md → Coverage gaps` for what `edt-mcp` does not cover (no dedicated BSL-syntax-only checker for a free-floating snippet, among others).
+External-knowledge servers (`1c-templates-fastcode`, `1c-ssl-mcp`, `1C-docs-mcp`, `v8std-local`) have **no `Grep` / `rg` equivalent** — they are called only when their knowledge is needed, not as part of the fallback above. See `content/skills/mcp-1c-tools/docs/edt-mcp.md → Coverage gaps` for what `edt-mcp` does not cover (no dedicated BSL-syntax-only checker for a free-floating snippet, among others).
+
+One of them also holds **this project's own routed standards**: the `1c-standards` collection of `1C-docs-mcp`, reached with the `standards` tool (never with `docsearch` / `docinfo`, which cannot see it). That is a *rule* lookup, not a project-source search — it is outside the chain above and has its own contract in `content/rules/help-corpus-retrieval.md`. Reading a rule file on disk is likewise ordinary work, not search.
 
 ---
 
@@ -63,11 +65,19 @@ Full-file `Read` is **normal work** — no MCP attempt, no justification note �
 | Form layout | `get_form_layout_snapshot` | `get_objects_by_tags`/`get_tags` |
 | Canonical pattern / template | **`templatesearch` only** — task description verbatim; pre-flight `1c-templates-fastcode.md → Query formulation (templatesearch only)` (`AGENTS.md → A.8`) (+ `ssl_search` for БСП) | — |
 | Platform API verification | `docinfo` or `docsearch` | `get_platform_documentation` (`edt-mcp`) |
+| A routed project standard (`anti-patterns`, `dev-standards-architecture`, …) | `standards(name="<rule stem>")` — **not** `docsearch`; `content/rules/help-corpus-retrieval.md` | `standards(query=…)` → `standards()` catalogue |
+| On-disk XML shape of a form / role / DCS / MXL | `formatspec(name=…)` or `formatspec(query=…)` | `get_xsd_schema` |
 | Does the platform ship a mechanism for X (СЛАУ, crypto, data analysis, bus, bots, …)? | `docsearch` (capability description) → `docinfo` per found name (`AGENTS.md → A.7`) | `ssl_search` for a БСП-level solution |
 | ITS standards (topic / prose) | `v8std_search` on `v8std-local` | `v8std_get_page` on a returned id for the full text |
 | ITS standard behind a diagnostic (ACC/АПК, BSLLS, EDT, v8-code-style) | `v8std_explain_diagnostics` on `v8std-local` | `v8std_get_related` to widen context |
 
 Native discovery tools (`Grep`, `Glob` / file search, directory listing, bulk `Read`) are absent from this table on purpose — they are not a first pick for any of these needs. Parameter names for each `edt-mcp` tool are **not** hard-coded here — consult the tool's live schema (`AGENTS.md → MCP Tool Calling → C.5`).
+
+---
+
+## EDT workspaces
+
+In a project developed in 1C:EDT (`.dev.env` `USE_EDT=true`) the chain above is unchanged — the project-index servers stay the first pick. `edt-mcp`, when exposed, is an **additional** source for live-workspace questions (`get_project_errors`, `find_references`, `go_to_definition`, `read_module_source`), not a replacement for indexed search: its `search_in_code` is a literal / regex sweep that is **not** ru/en dialect aware, so it ranks with `Grep`, not with `search_code`. When the EDT model holds newer state than the files on disk, reconcile before trusting either side — `content/rules/edt-workflow.md → Model vs disk — the synchronization rule`.
 
 ---
 

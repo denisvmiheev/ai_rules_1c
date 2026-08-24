@@ -63,7 +63,7 @@ Key rules to always remember:
 6. Design solution considering DRY, and project rules
 7. Verify metadata via `get_metadata_objects` and `get_metadata_details` for attribute types
 8. Use `get_content_assist` to discover available methods/properties for the context
-9. Use `docsearch` and `ssl_search` as needed; for specialized capabilities the platform-capability check is mandatory **before** custom design — `AGENTS.md → A.7`; **when a mechanism is found — use it**, do not invent a parallel one (`1c-platform-mcp.md → Using a found platform mechanism`)
+9. Use `docsearch` and `ssl_search` as needed; for specialized capabilities the platform-capability check is mandatory **before** custom design — `AGENTS.md → A.7`; **when a mechanism is found — use it**, do not invent a parallel one (`1C-docs-mcp.md → Using a found platform mechanism`)
 10. Write code strictly following the rules
 11. Check code via `revalidate_objects`/`validate_query`, `get_project_errors`, and `get_check_description`/`get_problem_summary` — within the verification budget from `AGENTS.md → MCP Tool Calling → B.1`
 12. Before refactoring, use `find_references` and `get_method_call_hierarchy` to understand impact

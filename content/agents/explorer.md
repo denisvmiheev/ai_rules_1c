@@ -40,7 +40,7 @@ See the **MCP Tool Calling** section in the project's `AGENTS.md` and the `mcp-1
    - **`get_form_layout_snapshot`** — form structure.
 2. **`1c-templates-fastcode`** — **`templatesearch` only:** task-description `query` + pre-flight (`docs/1c-templates-fastcode.md → Query formulation (templatesearch only)`); **`recall`** for project notes. Does not change how other tools are queried.
 3. **`1c-ssl-mcp`** — `ssl_search` to check whether a standard SSL/БСП function already covers the need.
-4. **`1c-platform-mcp`** — `docinfo` for known names, `docsearch` for description-based lookup of platform APIs.
+4. **`1C-docs-mcp`** — `docinfo` for known names, `docsearch` for description-based lookup of platform APIs.
 5. **`v8std-local`** — `v8std_search` / `v8std_explain_diagnostics` → **`v8std_get_page`** to read full standard/diagnostic text (see `docs/v8std.md`). Use **`1c-code-check-mcp`**'s `its_help` → `fetch_its` instead if that server is used.
 6. **Grep / Glob / `Read`-scanning** — only as an absolute last resort. Locating files by mask (`**/*.bsl`, `**/*.xml`), listing directories, reading modules one after another to find something, and reading a whole module for the sake of one routine (prefer `get_module_structure` / `search_in_code` / `get_module_structure`) are the same last-resort step as `Grep` — not a separate free action. Reading a file whose path came from an MCP result is normal work and needs no justification.
 

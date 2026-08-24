@@ -7,7 +7,7 @@ Read-only mirror of [v8std.ru](https://v8std.ru/) — ИТС "Стандарты
 ## What it is and is not
 
 - **Read-only knowledge source.** No analyzer run, no project inspection, no code changes. It answers "what does the standard say" and "which diagnostic enforces it" — not "does my code comply" (that is `get_project_errors` / `get_check_description` on `edt-mcp`).
-- **Complements, does not replace, `1c-platform-mcp`.** `docsearch`/`docinfo` (platform-mcp) answer platform-API questions ("does `Массив` have a `Найти` method"). `v8std-local` answers methodology / standards questions ("should this common module be named with `КлиентСервер` postfix", "which ITS standard bans `?()`"). Use both when a review or design decision needs both angles.
+- **Complements, does not replace, `1C-docs-mcp`.** `docsearch`/`docinfo` (docs-mcp) answer platform-API questions ("does `Массив` have a `Найти` method"). `v8std-local` answers methodology / standards questions ("should this common module be named with `КлиентСервер` postfix", "which ITS standard bans `?()`"). Use both when a review or design decision needs both angles.
 
 ## Tools
 

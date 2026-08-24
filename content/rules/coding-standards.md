@@ -28,7 +28,7 @@ Before writing new code — check common and manager modules for an existing exp
 
 **Templates:** when `templatesearch` returns a fitting template — **use it as the starting point**; adapt names/filters/placement only (`AGENTS.md → A.9`, `1c-templates-fastcode.md → Using a found template`). Do not rewrite the same solution from scratch.
 
-Reuse extends to the platform itself: when the task needs a specialized capability (cryptography, СЛАУ / numerical methods, data analysis, collaboration system / bots, integration bus / queues, full-text search, regex), run the platform-capability check (`docsearch` → `docinfo` on `1c-platform-mcp`, + `ssl_search`) before designing a custom implementation — `AGENTS.md → A.7`. **When a mechanism is found and usable — build on it**; do not invent a parallel custom implementation (`1c-platform-mcp.md → Using a found platform mechanism`).
+Reuse extends to the platform itself: when the task needs a specialized capability (cryptography, СЛАУ / numerical methods, data analysis, collaboration system / bots, integration bus / queues, full-text search, regex), run the platform-capability check (`docsearch` → `docinfo` on `1C-docs-mcp`, + `ssl_search`) before designing a custom implementation — `AGENTS.md → A.7`. **When a mechanism is found and usable — build on it**; do not invent a parallel custom implementation (`1C-docs-mcp.md → Using a found platform mechanism`).
 
 ## Module Regions
 

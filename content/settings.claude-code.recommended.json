@@ -4,8 +4,10 @@
     "allow": [
       "mcp__1c-templates-fastcode__recall",
       "mcp__1c-templates-fastcode__remember",
-      "mcp__1c-platform-mcp__docinfo",
-      "mcp__1c-platform-mcp__docsearch",
+      "mcp__1C-docs-mcp__docinfo",
+      "mcp__1C-docs-mcp__docsearch",
+      "mcp__1C-docs-mcp__standards",
+      "mcp__1C-docs-mcp__formatspec",
       "mcp__1c-ssl-mcp__ssl_search",
       "mcp__v8std-local__v8std_search",
       "mcp__v8std-local__v8std_get_page",
@@ -49,7 +51,7 @@
   "enabledMcpjsonServers": [
     "edt-mcp",
     "1c-ssl-mcp",
-    "1c-platform-mcp",
+    "1C-docs-mcp",
     "1c-templates-fastcode",
     "v8std-local"
   ],
