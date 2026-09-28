@@ -1,5 +1,6 @@
 ---
 description: Install DitriX EDT-MCP into a local 1C:EDT installation and connect the active AI client
+userOnly: true
 ---
 
 # /install-edt-mcp — install EDT-MCP
@@ -8,7 +9,7 @@ Installs the upstream [DitriXNew/EDT-MCP](https://github.com/DitriXNew/EDT-MCP) 
 
 EDT-MCP must run inside the same EDT process that owns the workspace. Do **not** put this plugin into the 1C MCP Docker bundle. Containerizing it is useful only when EDT itself, its workspace, runtime dependencies and UI/headless lifecycle are deliberately containerized; for a normal developer workstation it adds isolation problems and no useful portability.
 
-Use this command when the user develops in EDT and needs live IDE state, EDT diagnostics, native refactoring, metadata/forms, application launch/update, tests or debugging. It complements the 1C MCP bundle; it does not replace documentation, templates, BSP, code index or graph search.
+Use this command when the user develops in EDT and needs live IDE state, EDT diagnostics, native refactoring, metadata/forms, application launch/update or debugging. It complements the 1C MCP bundle; it does not replace documentation, templates, BSP, code index or graph search.
 
 Upstream currently ships a single build compiled against 1C:EDT `2026.1` and tested on `2026.2`. Verify the compatibility note in the upstream README at install time rather than assuming a version matrix from memory — it moves with EDT releases.
 
@@ -22,7 +23,7 @@ Read `USE_EDT` from `.dev.env` before installation.
 
 - `true` — continue.
 - `false` — the explicit command is allowed, but ask whether this project should now use EDT. Continue only after confirmation and set `USE_EDT=true` without changing other keys.
-- missing, empty or invalid — ask once and persist `true` when the user confirms installation. If `.dev.env` does not exist, do not create a partial file; tell the user to initialize the rules first.
+- missing, empty or invalid — ask once and persist `true` when the user confirms installation. If `.dev.env` is missing, run the installer (`install.ps1 init`) instead of creating a partial file.
 
 Do not infer project policy merely from an EDT executable found elsewhere on the workstation.
 

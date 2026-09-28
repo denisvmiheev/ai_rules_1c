@@ -14,24 +14,7 @@ The methodology is adapted from the `systematic-debugging` skill of [obra/superp
 
 <!-- help-mcp-router -->
 
-## Where this standard lives
-
-**The normative text of this file is not inlined here.** It is one document of the `1c-standards` collection on the Help MCP server (`1C-docs-mcp`):
-
-```
-standards(name="systematic-debugging")     # this standard, entire - the normal call
-standards(query="<what you need>")  # only when unsure which rule governs
-```
-
-`standards` is the tool for this collection. `docsearch` / `docinfo` serve the platform documentation and cannot reach it, and **no tool of this server takes a `corpus` argument**. Name resolution, paging, budget, and what to do when the server is not exposed - **`content/rules/help-corpus-retrieval.md`**.
-
-**Retrieve before you apply.** Every section below is a heading with no body: acting on a section title without the text behind it is inventing the rule, not following it. Fetch the rule once by name rather than a query per section.
-
-Pinned source, readable directly: <https://github.com/comol/ai_rules_1c/blob/410951e74fd3e6b7a763cf49757935b9a34d3f31/content/rules/systematic-debugging.md>
-
-## Sections
-
-Every heading this file has always had, reproduced so that existing `systematic-debugging.md` section references and anchor links still resolve - the same compatibility shape `dev-standards-core.md` uses. Each is a retrieval target, not a summary.
+> **Retrieve through MCP only.** Call `standards(name="systematic-debugging")` on `1C-docs-mcp` before applying this standard. Retrieval, paging, and unavailable-server policy: `content/rules/help-corpus-retrieval.md`. Headings below are retrieval targets, not summaries.
 
 ## Core principle
 
@@ -54,7 +37,7 @@ Required outputs of this phase — **in the scope relevant to the bug** (a pure 
 
 Tools to use:
 
-- **`vcloggetlasterror`** (`1c-data-mcp`, when the server is exposed in the session) — pull the most recent error from `ЖурналРегистрации` of the live IB without leaving the agent: timestamp, event, affected metadata object, data presentation, full description. Run it immediately after the user's repro attempt to confirm an error landed in the log and on what object. Limitation: only the single most recent record with `УровеньЖурналаРегистрации.Ошибка` in the last 24 h. Wider filters / older records → fall back to the Configurator's `ОтчетПоЖурналуРегистрации` or to a custom `ВыгрузитьЖурналРегистрации` wrapped in `vcexecutecode`.
+- **`get_event_log`** (`edt-mcp`) — reads the infobase event log **offline** (no running session): timestamp, event, affected metadata object, data presentation, full description; filter by period, user, severity, event / comment / metadata substring, session. Run it immediately after the user's repro attempt to confirm an error landed in the log and on what object. It returns infobase PII — quote only what the diagnosis needs. When the log files are unreachable, fall back to the Configurator's `ОтчетПоЖурналуРегистрации`.
 - **Configurator → Debug** (`Отладка → Подключиться`) to attach to the running session, capture the call stack, inspect locals.
 - **`ЖурналРегистрации`** filter by date range / user / event / metadata to find the failing call. For high-volume errors prefer `ВыгрузитьЖурналРегистрации` to a `ТаблицаЗначений` for offline analysis.
 - **Technological log** (`logcfg.xml`) for platform-level events (DBMS errors, deadlocks, lock conflicts, timeouts) when the application log is not enough.
@@ -78,8 +61,8 @@ Tools to use:
 - **`get_method_call_hierarchy`** to map all call paths that reach the failing routine, and the routines it calls.
 - **`find_references`** for object-level dependencies of the owning module / metadata object (registers, referenced objects, movements), not as a routine-call query.
 - **`docinfo`** to verify that a built-in function actually does what you assume — many bugs are platform-version-dependent (`ТекущаяДатаСеанса` vs `ТекущаяДата`, `НайтиПоНаименованию` collation, `ПолучитьСтруктуруХраненияБазыДанных` differences across versions).
-- **`v8std_search`** on `v8std-local` to verify the documented behaviour of the platform mechanism you suspect (or `its_help` → `fetch_its` on `1c-code-check-mcp` if that server is used instead).
-- **`ask_1c_ai`** as a hint generator (treat as a draft — do not let an AI hint replace the falsifying experiment).
+- **`v8std_search`** on `v8std-local` to verify the documented behaviour of the platform mechanism you suspect (`v8std_get_page` for the full article).
+- **`ask_workmate`** as a hint generator (treat as a draft — do not let an AI hint replace the falsifying experiment).
 
 Produce at least 2 hypotheses. In the full loop a single hypothesis is anchoring bias — challenge it with a competing one even when it feels right (a bug that genuinely admits only one explanation belongs on the fast path, not here).
 

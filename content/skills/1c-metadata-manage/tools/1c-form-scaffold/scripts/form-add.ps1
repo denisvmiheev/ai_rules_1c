@@ -1,5 +1,8 @@
-﻿# form-add v1.11 — Add managed form to 1C config object
+﻿# form-add v1.12 — Add managed form to 1C config object
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
+# Local: -FormName must be a 1C identifier (refused with exit 2 before any path
+# or XPath is built from it), and the object form of an information register
+# names its RecordManager main attribute "Запись", as the Configurator does.
 param(
 	[Parameter(Mandatory)]
 	[string]$ObjectPath,
@@ -194,6 +197,17 @@ function Detect-FormatVersion([string]$dir) {
 	return "2.17"
 }
 
+# --- Фаза 0: имя формы — идентификатор 1С ---
+# The name becomes a file name, a directory name and an XPath literal below, so it
+# is checked before any of them is built: path separators, ".." or a quote would
+# otherwise escape the Forms directory or break the XPath. Same allowlist as
+# remove-form.ps1 (Latin / Cyrillic letters, digits, underscore, not starting
+# with a digit, up to 128 characters); \z so a trailing newline is not accepted.
+if ($FormName -cnotmatch '^[A-Za-z_А-яЁё][0-9A-Za-z_А-яЁё]{0,127}\z') {
+	[Console]::Error.WriteLine("Недопустимое имя формы (-FormName): '$FormName'. Ожидается идентификатор 1С (латиница или кириллица, цифры и подчёркивание, не начинается с цифры, до 128 символов).")
+	exit 2
+}
+
 # --- Фаза 1: Определение типа объекта ---
 
 # Resolve ObjectPath (directory → .xml)
@@ -332,6 +346,15 @@ $encBom = New-Object System.Text.UTF8Encoding($true)
 
 $formUuid = [guid]::NewGuid().ToString()
 
+function ConvertTo-XmlText([string]$Value) {
+	# The descriptor below is a here-string, not a serializer, so an ordinary synonym
+	# such as "A & B" used to land in the file verbatim and made it unparseable - while
+	# the scaffolder still exited 0 and the validator still passed, because it only
+	# checked that the descriptor path existed. Escape escapes the same five entities
+	# as xml_text() in form-add.py, so the two runtimes stay byte-identical.
+	return [System.Security.SecurityElement]::Escape($Value)
+}
+
 # ExtendedPresentation — only for DataProcessor, Report, ExternalDataProcessor, ExternalReport forms
 $extPresentationLine = ""
 if ($objectType -in $processorLikeTypes) {
@@ -343,11 +366,11 @@ $formMetaXml = @"
 <MetaDataObject xmlns="http://v8.1c.ru/8.3/MDClasses" xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:cfg="http://v8.1c.ru/8.1/data/enterprise/current-config" xmlns:cmi="http://v8.1c.ru/8.2/managed-application/cmi" xmlns:ent="http://v8.1c.ru/8.1/data/enterprise" xmlns:lf="http://v8.1c.ru/8.2/managed-application/logform" xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows" xmlns:xen="http://v8.1c.ru/8.3/xcf/enums" xmlns:xpr="http://v8.1c.ru/8.3/xcf/predef" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="$($script:formatVersion)">
 	<Form uuid="$formUuid">
 		<Properties>
-			<Name>$FormName</Name>
+			<Name>$(ConvertTo-XmlText $FormName)</Name>
 			<Synonym>
 				<v8:item>
 					<v8:lang>ru</v8:lang>
-					<v8:content>$Synonym</v8:content>
+					<v8:content>$(ConvertTo-XmlText $Synonym)</v8:content>
 				</v8:item>
 			</Synonym>
 			<Comment/>
@@ -419,8 +442,9 @@ if ($Purpose -eq "List" -or $Purpose -eq "Choice") {
 </Form>
 "@
 } else {
-	# Object — форма объекта
-	$mainAttrName = "Объект"
+	# Object — форма объекта. У регистра сведений главный реквизит менеджера записи
+	# называется «Запись», как в формах записи Конфигуратора.
+	$mainAttrName = if ($objectType -eq "InformationRegister") { "Запись" } else { "Объект" }
 
 	# Маппинг типа объекта на тип реквизита
 	$attrTypeMap = @{
@@ -607,15 +631,11 @@ if ($SetDefault -or $isFirstFormForPurpose) {
 }
 
 # Сохранить с BOM
-$settings = New-Object System.Xml.XmlWriterSettings
-$settings.Encoding = $encBom
-$settings.Indent = $false
-
-$stream = New-Object System.IO.FileStream($objectXmlFull.Path, [System.IO.FileMode]::Create)
-$writer = [System.Xml.XmlWriter]::Create($stream, $settings)
-$xmlDoc.Save($writer)
-$writer.Close()
-$stream.Close()
+$xmlText = $xmlDoc.OuterXml
+$xmlText = [regex]::Replace($xmlText, '(?s)<!\[CDATA\[.*?\]\]>|<!--.*?-->|<\?.*?\?>|(?<=\S) />', { param($m) if ($m.Value -eq ' />') { '/>' } else { $m.Value } })
+$targetEol = if ([System.IO.File]::ReadAllText($objectXmlFull.Path) -match "`r`n") { "`r`n" } else { "`n" }
+$xmlText = ($xmlText -replace "`r`n", "`n") -replace "`n", $targetEol
+[System.IO.File]::WriteAllText($objectXmlFull.Path, $xmlText, $encBom)
 
 # --- Фаза 5: Вывод ---
 

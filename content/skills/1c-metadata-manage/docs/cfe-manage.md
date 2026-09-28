@@ -6,6 +6,8 @@ Comprehensive extension (CFE) management: create scaffold, borrow objects from c
 
 ## 1. Init — Create Extension Scaffold
 
+Use `init` only for an explicitly requested **new** extension. Existing-extension edits, folder moves, renames, updates and restores retain identifiers and borrowed links; they do not start from a new scaffold. Follow `content/rules/extension-workspace.md → Preserve extension identity`, including investigation of unexpected UUID changes before load/apply.
+
 ```powershell
 powershell.exe -NoProfile -File skills/1c-metadata-manage/tools/1c-cfe-manage/scripts/cfe-init.ps1 -Name "МоёРасширение"
 ```
@@ -52,6 +54,8 @@ powershell.exe -NoProfile -File skills/1c-metadata-manage/tools/1c-cfe-manage/sc
 Format: `Catalog.X`, `CommonModule.Y`, `Document.Z`. All 44 object types supported. Batch: `"Catalog.X ;; CommonModule.Y ;; Enum.Z"`.
 
 Creates XML files with `ObjectBelonging=Adopted` and `ExtendedConfigurationObject`, adds to ChildObjects.
+
+For an already borrowed object, preserve its existing identifier and base-object link; do not recreate it to move/rename the source tree or to hide a mapping mismatch. Resolve the intended base and target before any change to the borrowing relationship.
 
 ---
 
@@ -172,6 +176,13 @@ powershell.exe -NoProfile -File skills/1c-metadata-manage/tools/1c-cfe-manage/sc
 
 Exit code: 0 = OK, 1 = errors.
 
+For a complete hierarchical extension dump, additionally run
+`tools/1c-cf-manage/scripts/dump-validate.ps1 -ConfigPath "<extension-directory>"`.
+It checks the extension's own file inventory, nested subsystems, versions,
+selected references and optional `ConfigDumpInfo.xml`. JSON output and exact
+coverage: [Complete dump integrity](cf-manage.md#complete-dump-integrity).
+This check does not compare the extension with its base configuration.
+
 ### What `cfe-validate` cannot see — the platform check is a separate step
 
 All nine checks read **source**: XML shape, ClassIds, ChildObjects ordering, adopted-object markers. They are silent about the one failure mode that actually breaks a base — an interceptor whose target method no longer exists in the main configuration. `&Вместо ПриЗаписи` against a method the vendor renamed is perfectly valid XML and perfectly valid BSL; the platform rejects it only at apply time, and an `&После` in the same position may just stop firing with no error at all.
@@ -188,6 +199,8 @@ Read the verdict from three signals (process exit code, `/DumpResult`, `/Out` di
 
 For a `&ИзменениеИКонтроль`-heavy extension, `-Check` (section 4) and the applicability check answer related questions from opposite ends: drift detection names the *method* whose original moved, the platform names the *error*. Run `-Check` first — it is cheaper and its output is more actionable.
 
+Record the exact checked combination and evidence in the existing extension README or delivery description (`content/rules/extension-workspace.md → Checked compatibility`). Source/drift validation is not evidence of an applied or tested infobase. Reuse the authorized `/update1cbase` load → checks → apply sequence and any executed scenarios; record missing checks without widening the workflow.
+
 ### Backup and rollback before replacing an existing extension
 
 Loading over an existing extension is a replacement with no platform-side undo. Dump both forms first — `/DumpCfg -Extension <Name>` (editable) and `/DumpDBCfg -Extension <Name>` (database, what running sessions execute) — and recover with `/RollbackCfg -Extension <Name>` before the DB update, or by reloading the saved `.cfe` after it. **Never delete a pre-existing extension as a rollback**: deletion drops its own objects and every mapping along with your change. Details — `content/rules/designer-batch-checks.md → Extension apply and rollback`.
@@ -195,6 +208,8 @@ Loading over an existing extension is a replacement with no platform-side undo. 
 ---
 
 ## Typical Extension Workflow
+
+The `init` step below is for a new extension only; an existing target starts from its current sources/backup and preserves its identity. Recheck root/graph mappings and evidence after a move, rename or restore.
 
 ```
 1c-cf-manage info <config>          — get base config version/compatibility
@@ -210,55 +225,4 @@ Loading over an existing extension is a replacement with no platform-side undo. 
                                     — platform-level ladder, designer-batch-checks.md
 ```
 
-## Recent Additions (upstream sync `2026-07-30`)
-
-The PowerShell scripts under `tools/1c-cfe-manage/scripts/` were refreshed from [Nikolay-Shirokov/cc-1c-skills](https://github.com/Nikolay-Shirokov/cc-1c-skills). Highlights of this sync (previous base: late May 2026):
-
-### `cfe-patch-method` — v1.1 → v2.5, the biggest change in this group
-
-- **Source-aware generation**: the original method is read from the source configuration (`-ConfigPath`, auto-detectable via `.dev.env` `EXPORT_PATH`), so the interceptor gets the real signature, context directive and — for `ModificationAndControl` — the full original body. `ModulePath` may now be a path to the source `.bsl` instead of a logical name.
-- **`Instead` (`&Вместо`)** interceptor type with a `ПродолжитьВызов(...)` scaffold; works for functions too.
-- **Drift control** — `-Check` / `-Actualize` over controlled (`&ИзменениеИКонтроль`) methods, extension-wide or narrowed to a module / method. Re-applies your `#Вставка` / `#Удаление` edits onto a changed vendor original, reports what moved, what conflicted and what the vendor has already adopted. Conflicts land in a merge workspace with anchored `conflict.md` files instead of being lost. **Run `-Check` after every vendor update** — the platform never reports this drift itself.
-- Repeated interception of an already patched method is skipped instead of duplicated.
-
-Full description in section 4 above.
-
-### `cfe-borrow` — borrowing forms now matches Configurator output
-
-- The borrowed form gets the **complete `ChildItems` tree** (not the previously empty skeleton). Loadable into the target base without manual XML fixes for complex ERP forms.
-- **Dependencies are auto-borrowed**: shared pictures, style elements, enums, and enum values used by the borrowed form. No more cascade of "object not found" errors after the first load.
-- `DataPath`, `Events`, `TitleDataPath`, `TypeLink`, `CommandName` are stripped from the borrowed form (these caused "invalid data path" / "event not loaded" errors on real ERP forms, also for command-bar buttons).
-- Form-level properties (`AutoTitle`, `WindowOpeningMode`, …) are preserved both in the main section and in `BaseForm`.
-- **`-BorrowMainAttribute`** (`Form` or `All`) — borrows the form's main attribute (`Object`) and transitively all its attributes, tabular sections, and dependent types. Closes the manual-collection workflow when adding an attribute to a borrowed form.
-
-### `cfe-validate`
-
-- New checks for borrowed-form structure, their dependencies (shared pictures, style elements, enums), and the extension's own subobjects (attributes, tabular sections, enum values, forms).
-- False positives removed: `DataPath` / `TitleDataPath` inside `BaseForm` are correct (Configurator emits them); the extension's own subobjects (own attributes, own enum values) are no longer validated as borrowed.
-
-### `cfe-init`
-
-- Interface mode and compatibility mode are inherited from the base configuration (resolved via `-ConfigPath`). The extension matches the base's behaviour by default.
-
-### Vendor support
-
-An extension is the **default answer** when a typical object on vendor support needs a change: support state stays untouched and vendor updates keep flowing. The mutating tools of this skill now enforce that — they refuse to edit a locked object directly and point here. See [support-manage.md](support-manage.md).
-
-## MCP Integration
-
-- **get_object_dossier** — Comprehensive structural passport of the base object before borrowing (structure, forms, dependencies, code modules, roles).
-- **metadatasearch** — Find objects to borrow and verify module paths.
-- **get_metadata_details** — Get full object structure for objects being borrowed.
-- **search_code** — Find methods to intercept (prefer over `codesearch`; supports semantic/fulltext/hybrid search with detail levels L0–L3).
-- **codesearch** — Find methods in raw BSL files (fallback when `search_code` is not available).
-- **metadatasearch** (`names_only=true`) — Find similar metadata objects for extension XML reference.
-- **compare_base_and_extension** — Structural diff between base and extension after borrowing: attributes, forms, and routines added/overridden/unchanged.
-- **trace_impact** — Recursive impact analysis of extension changes on the base configuration (preferred over `graph_dependencies` for deep dependency chains).
-- **graph_dependencies** — Flat dependency overview before borrowing.
-- **syntaxcheck** — Verify generated BSL code.
-
-## SDD Integration
-
-When creating extensions as part of a feature, update SDD artifacts if present (see `content/rules/sdd-integrations.md` for detection):
-
-- **OpenSpec**: Document borrowed objects, interceptors, and extension scope in spec deltas under `openspec/changes/`.
+Scripts vendored from Nikolay-Shirokov/cc-1c-skills; sync history — `docs/CHANGELOG.md`.

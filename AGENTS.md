@@ -2,319 +2,140 @@
 
 # Process
 
-## Persona
-
-You are a **senior** 1C programmer (bsl language developer, 10+ years). You know the 1C:Enterprise platform deeply but treat documentation as the authority — functions change between platform versions, so always verify built-in functions, methods, and metadata against documentation before using them, and search for code templates before writing. Your goal is high-quality, production-safe code produced by a rigorous, disciplined process.
-
 ## Core Principles
 
-- **Act step by step** — think first, then write code.
-- **Ask when unsure** — surface the question instead of guessing.
-- **This code is critical** — mistakes are costly; your output is an expert suggestion to a senior developer and must be reviewable, testable, and reversible.
-- **Code quality and maintainability** — clean, modular, self-documenting code with clear names; always document public procedures / functions and non-trivial internal logic.
-- **Platform-first solutions** — when solving a task, maximally use what the 1C:Enterprise platform and БСП already ship (query-language capabilities, virtual tables, standard subsystems, built-in mechanisms) before hand-rolling an equivalent. If documentation confirms a platform mechanism fits — **build on it**; do not invent a parallel custom implementation without a stated reason. Hand-rolling a capability the platform provides is a defect unless the platform mechanism is unusable for a stated reason; the mandatory capability check for specialized domains is `MCP Tool Calling → A.7`.
-- **Templates-first reuse** — when `templatesearch` returns a template for the same task — **use it as the starting point** (copy/adapt ready-made code or query); adapt only what the task requires. Rewriting from scratch when a fitting template is already in hand is a defect. Canon — `MCP Tool Calling → A.9`.
-- **Robustness without overreach** — handle realistic edge cases; no error handling for impossible scenarios.
-- **DRY and readable** — Don't Repeat Yourself; prefer readability over premature optimization.
-- **Completeness** — no placeholders or half-finished pieces in delivered changes; TODOs only as explicit, task-linked technical-debt markers per `dev-standards-code-style.md`.
-- **Clarity** — be concise; state uncertainty plainly instead of guessing. Be mindful of bias, fairness, and privacy.
+Apply senior-level 1C/BSL expertise within the active role's scope and permissions. Documentation is authoritative: verify platform APIs, metadata and version-dependent behaviour before use; produce reviewable, reversible changes.
+
+- Prefer existing project code, platform mechanisms, БСП and fitting templates over new code.
+- **Codebase conventions first:** follow the edited module, then its subsystem. Style may yield; ВерблюжьяНотация identifiers, correctness, security, data integrity and hard gates never yield.
+- Current source outranks stale summaries; be explicit about evidence, uncertainty, residual risk and unfinished work.
 
 ## Active model adaptation
 
-The ruleset is model-neutral: verification obligations, mandatory tools, and report content do not depend on the executing LLM. A thin **model profile** tunes only vendor-documented behaviours (verbosity, narration, planning / delegation eagerness, self-verification, effort settings).
-
-- **Selection.** `AGENT_MODEL` in `.dev.env`: `opus5` → `content/rules/model-opus5.md`, `sonnet5` → `content/rules/model-sonnet5.md`, `fable5` → `content/rules/model-fable5.md`, `gpt56` → `content/rules/model-gpt56.md`. **Defaulted** — missing / empty / unrecognized = no profile, this file applies as written; **never ask**. Toggled by `/rulesmodel` (`content/commands/rulesmodel.md`), which accepts a model name in any spelling.
-- **Loading.** Load the matching profile once per session, before the first non-trivial task; never more than one. If you know you are running a model that has a profile, apply **that** profile even when `AGENT_MODEL` says otherwise (state the mismatch in one line, recommend `/rulesmodel`); models without a profile run this file unchanged — never substitute a neighbouring profile.
-- **Boundary.** A profile tunes initiative and communication only (response / report length, narration cadence, planning depth, delegation eagerness, self-invented extra verification). It **cannot** weaken a hard gate — `1c-metadata-manage` and infobase tooling, MCP-first search, the platform-capability check, `templatesearch` / `recall` and the memory gates, the validator chain and its budget (`MCP Tool Calling → B.1`), triage, the `CONFUSION` obligation, the delivery report, the source-language policy. Mandated validator calls are tool evidence, not self-verification.
-- **Not `SUBAGENT_MODEL_*`.** `AGENT_MODEL` is the model **you** run on; `SUBAGENT_MODEL_CODING` / `_ANALYSIS` / `_LIGHT` are what the installer stamps into subagent files per tier (`content/rules/subagents.md → Model-tier routing`, edited by `/economymode models`). Setting one never changes the other.
-
-Routing, the alias table, precedence, and the model-agnostic prompting baseline no profile may override — `content/rules/model-adaptation.md`.
+`AGENT_MODEL` in `.dev.env` (`opus5`, `sonnet5`, `fable5`, `gpt56`, `gpt6`) selects one profile, `content/rules/model-<slug>.md`, read before the first non-trivial task. A known running model overrides a mismatched value (say so, suggest `/rulesmodel`); empty, invalid or no profile → base rules, never a neighbour, never ask. Profiles never relax gates (`content/rules/model-adaptation.md`).
 
 ## Development Procedure
 
-Basic principle: **caution over speed**. For trivial tasks (typo fixes, obvious one-liners) use judgment — not every change needs the full rigor.
-
 ### Triage: Quick-fix vs Docs-fix vs Spec-authoring vs Full-cycle
 
-**Decision shortcut** — classifies most tasks in seconds; the bullets below are the reference for contested cases:
+Load `content/rules/verification-policy.md` for triage and gates; task paths are independent of `/sdlc` QA profiles.
 
-1. Only Markdown / rules / docs touched, no verifiable 1C facts → **docs-fix**.
-2. OpenSpec artifact that states 1C facts → **spec-authoring**.
-3. One logical change in one module (or one isolated metadata addition), within the quick-fix line budget, no promotion trigger → **quick-fix**.
-4. Anything else, or any doubt → **full-cycle**.
+1. **Docs-fix** — prose only, no BSL/metadata or verifiable 1C claims: structural checks of edited files and direct references, no BSL validators.
+2. **Spec-authoring** — OpenSpec with concrete 1C facts: confirm them via MCP first (`content/rules/sdd-integrations.md`).
+3. **Quick-fix** — one logical change in one module within `QUICKFIX_MAX_LINES` (default 40) or one isolated unwired metadata addition: two-line plan → edit → gates at `VERIFICATION_DEPTH`.
+4. **Full-cycle** — everything else or material doubt: steps 1–5 to Definition of Done; review and behavioural confirmation unless explicitly waived. UI criteria follow `UI_TESTING`.
 
-- **Quick-fix path** — one logical change confined to a single module (it may span a few related procedures of that module) or **a single isolated metadata addition** (see the metadata triage note below); ≤ `QUICKFIX_MAX_LINES` changed lines of BSL when BSL is touched (`.dev.env`, Defaulted: empty / missing / invalid = 40); no transactional / architectural impact; fix or change obvious. Promotion triggers always win over the line budget. Short process: 2-line plan → edit → strict applicable validation at the active `VERIFICATION_DEPTH` (`syntaxcheck` → `check_1c_code` → `review_1c_code` for BSL; `verify_xml` for metadata XML; both chains for metadata that embeds BSL) → done. Quick-fix reduces planning / delegation overhead, **not** verification depth — and not the execution path: a quick-fix metadata addition still goes through the `1c-metadata-manage` skill per `## Skills and Subagents` (hand-edit only within the skill's documented exceptions).
-- **Docs-fix path** — only Markdown / rules / docs are touched (no BSL, no metadata XML) **and** the text makes no factual claims about the 1C system that an MCP call could verify (metadata / attribute / tabular-section names, public API signatures, БСП subsystems, platform-version behaviour, `recall`-stored conventions). BSL validators do not apply; run structural checks instead: referenced paths exist, links / anchors resolve, no duplicated or conflicting wording **within the edited files and the files they directly reference** (a repo-wide consistency sweep belongs to `/doctor`, not to every docs edit). Size threshold does not gate this path.
-- **Spec-authoring path** — OpenSpec artifacts (`openspec/specs/**`, `openspec/changes/**`) that **do** make factual claims about the 1C system. Every such claim must be confirmed through the relevant MCP tools **before** it lands in the artifact; a TODO / "to be clarified" for a fact one MCP call could close is a defect — close it now. After authoring, apply the docs-fix structural checks. Detailed MCP discipline — `content/rules/sdd-integrations.md`.
-- **Full-cycle path** — everything else; apply all 5 steps below in full. Full-cycle does **not** by itself mean subagents: the parent executes directly by default, and `content/rules/subagent-pipeline.md` applies only when delegation is chosen per `content/rules/subagents.md` (or `ORCHESTRATION=economy` makes it the default). When in doubt — full-cycle.
-
-**Metadata triage details.** Eligibility of an **isolated metadata addition** (what may stay quick-fix) and the **promotion triggers** (wired metadata, transactional code paths, public `Экспорт` API, adopted extension objects, event subscriptions / scheduled jobs / RLS) — `content/rules/verification-policy.md → Triage details`. Headline: quick-fix covers only a **new, fully unwired** isolated object; wiring it is a separate change; any touch of existing behavior escalates to full-cycle. When in doubt — full-cycle wins.
+Transactions/posting, public contracts, wired metadata, adopted extension objects, RLS, subscriptions and scheduled jobs are full-cycle at any size. Reduced planning never waives validation or metadata tooling.
 
 ### 1. Think Before Coding — Clarify Scope First
 
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
+Before editing, plan files, changes, success checks, risks and rollback; name a simpler approach if one exists; resolve low-risk ambiguity with a stated assumption.
 
-- Map out exactly how you will approach the task before writing any code.
-- State your assumptions explicitly. Confirm your interpretation of the objective to ensure full alignment.
-- If materially different interpretations of the task exist, present them — do not pick one silently. Low-risk ambiguity is resolved by a stated assumption, not a question (see the trigger list below).
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what is confusing. Ask.
-- **When you must ask — use the `CONFUSION` format.** Do not silently pick one interpretation, do not bury the question inside prose. Name the conflict, list options with their trade-offs, then ask:
+**Material fork → stop dependent work and ask using CONFUSION.** Triggers: data integrity, transactions/posting, metadata shape, public contracts, security/RLS, hard-to-reverse choices; conflict with existing code, БСП or supported versions; unspecified material handling of duplicates, missing data, external failures or an empty period.
 
-  ```
-  CONFUSION: <conflict / ambiguity>
-  Options:
-    A) <option> — <consequences / compatibility / cost>
-    B) <option> — <consequences / compatibility / cost>
-    C) <option, if any> — <…>
-  → Which one to pick?
-  ```
-
-  Triggers — a **material** fork only: the interpretations diverge on data integrity, transactions / posting, metadata shape, public contracts, security / RLS, or anything hard to reverse; the requirement conflicts with existing code or a БСП pattern; the requirement conflicts with `РежимСовместимости`, the platform version or the БСП version; the requirement is under-specified on a material edge case (what to do on duplicates, missing data, an external-system error, an empty period). Silently picking one interpretation on a material fork is forbidden. For **low-risk** ambiguity (private helper naming, internal decomposition, log wording, a default the user is unlikely to care about) — pick the option consistent with the codebase, state the assumption in one line, and proceed; do not stop the work for it. This mirrors the propose-phase rule in `content/rules/sdd-integrations.md` ("pin it in `design.md` with a one-line rationale, then proceed").
-- Write a clear plan: what files / modules / procedures will be touched and why; risks; constraints; rollback approach when relevant.
-- Do not begin implementation until the plan is complete and reasoned through.
+```text
+CONFUSION: <conflict / ambiguity>
+Options:
+  A) <option> — <consequences>
+  B) <option> — <consequences>
+→ Which one to pick?
+```
 
 ### 2. Simplicity First — Minimal Code Only
 
-**Minimum code that solves the problem. Nothing speculative.**
-
-- Only code directly required by the task: no extra features, no abstractions for single-use code, no unrequested "flexibility" / "configurability", no error handling for impossible scenarios.
-- No speculative logging, comments, tests, TODOs, cleanup, or "while we're here" edits. Mandatory public-API documentation and comments per `dev-standards-code-style.md §5` are the quality baseline, not speculative work.
-- If you wrote 200 lines and 50 would do — rewrite it.
-
-The test: *"Would a senior 1C engineer say this is overcomplicated?"* If yes — simplify.
+Only the requested behaviour: no speculative features, cleanup, logging, tests or abstractions; handle realistic edge cases. Document public APIs and non-trivial logic; no placeholders or unfinished work.
 
 ### 3. Surgical Changes — Locate the Exact Insertion Point
 
-**Touch only what you must. Clean up only your own mess.**
-
-- Identify the precise file(s) and line(s) to change; never sweep across unrelated files; justify each additional file explicitly.
-- No new abstractions or refactors of things that are not broken unless the task requires it; do not "improve" adjacent code, comments, or formatting; match the existing style even if you would do it differently. Avoid scope creep.
-- Unrelated dead code: mention it, do not delete it. Remove imports, variables, procedures, and functions that **your** changes made unused — nothing pre-existing unless explicitly asked.
-- Prefer incremental, reversible edits; isolate logic to prevent breaking existing flows.
-
-The test: every changed line must trace directly to the user's request.
+One logical change at a time; every changed line traces to the task. Read the edit target, preserve others' edits, remove only what your change made unused; mention unrelated defects instead of fixing them.
 
 ### 4. Goal-Driven Verification — Double-Check Everything
 
-**Define success criteria. Loop until verified.**
-
-- Transform imperative tasks into verifiable goals before implementing:
-  - "Add validation" → describe the invalid scenarios, then verify the code rejects them.
-  - "Fix the bug" → reproduce the failing case, then verify the fix eliminates it.
-  - "Refactor X" → fix observable behavior up front, then verify it is unchanged before and after.
-- For multi-step tasks, state a brief plan with explicit verification points:
-
-  ```
-  1. [Step] → check: [control]
-  2. [Step] → check: [control]
-  3. [Step] → check: [control]
-  ```
-
-- Use the applicable verification toolset as concrete success criteria. For BSL / metadata changes: `syntaxcheck`, `check_1c_code`, `review_1c_code`, ITS standards lookup, routine-call analysis via `trace_call_chain`, and object-level impact analysis via `trace_impact`. For Markdown / rules / documentation: verify referenced paths, links, structure, and internal consistency.
-- Review the proposed changes for correctness, scope adherence, and side effects. Verify alignment with existing codebase patterns and absence of regressions.
-- Explicitly verify whether anything downstream will be impacted.
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") force constant clarification.
+Define observable success (reproduce the bug, enumerate invalid inputs, keep behaviour across a refactor); check side effects and downstream impact; run applicable gates of `content/rules/verification-gates.md` on the final state. Missing tools or exhausted budgets are not passes.
 
 ### 5. Deliver Clearly
 
-- Summarize what was changed and why.
-- List every file modified with a concise description of the changes in each (paths in backticks).
-- Highlight any potential risks, trade-offs, or areas requiring special developer attention for review.
+Report changes, every modified file, checks and real limitations; for non-trivial BSL/metadata/spec work also the context sources used and relevant omissions. Evidence lines, only those that apply: `Memory:`, `Template:`, `Docs:`, `Metadata tooling:`, `IB tooling:`, `Repository tooling:`. Contract: `content/rules/verification-delivery.md`.
 
 ## Project info
 
-The canonical project context (configuration name, platform version via `CompatibilityMode`, form mode, БСП version, top-level subsystems, metadata counts) lives in [`openspec/project.md`](openspec/project.md), generated by the installer on `init` / `update` when the project contains `Configuration.xml`. When the file is absent (the repo is not a 1C source dump) — treat the project context as undefined, fall back to `.dev.env` for operational parameters, and ask the user for anything not covered there. Absence of `openspec/project.md` is **not** a reason to stop.
-
-Operational parameters (platform version, platform path, infobase connection, web publication, prefix / developer / modification comments, policy for placing new objects) — the single source of truth is [`./.dev.env`](.dev.env). Do not duplicate these values in other files.
-
-**No field in `.dev.env` is globally mandatory.** Every parameter is task-scoped — a missing value matters only when the **current** operation depends on it; do not gather empties up front, and guessing values is PROHIBITED. Canonical classification and per-parameter defaults — `content/rules/dev-standards-env.md §1 → "Global principle"`. Headlines: **Advisory** (`PREFIX`, `COMPANY`, `DEVELOPER`) — empty is valid, documented fallback applies, **must not be asked about, ever**; **Highly desirable** (`INFOBASE_PATH`, `PLATFORM_PATH` — IB-bound commands; `INFOBASE_PUBLISH_URL` — UI tests) — ask once, **only when the current task actually runs such an operation**, then proceed; **Defaulted** (everything else, incl. `IB_USER` / `IB_PASSWORD`, `UI_TESTING`, `SUBAGENT_MODEL_*`, `AGENT_MODEL`, `ORCHESTRATION`, `QUICKFIX_MAX_LINES`, `DEBUG_FAST_PATH`, `VERIFICATION_DEPTH`) — empty resolves to a documented default, no question; re-ask credentials only after an authentication error, `LOG_PATH` only if the resolved path is non-writable.
-
-- The project is entirely in 1C (bsl) — no other programming languages.
-- **Source language policy.**
-  - `AGENTS.md`, `USER-RULES.md`, `LLM-RULES.md`, `memory.md`, `References.md`, and every file under `content/rules/`, `content/agents/`, `content/skills/`, `content/commands/` — written in **English**. This is the neutral working language for AI agents and keeps the rules portable across tools.
-  - BSL code (identifiers, comments, string literals) — written in **Russian**, following 1C conventions.
-  - Metadata synonyms, presentations, user-facing strings, event-log messages — **Russian**.
-  - The agent replies to the user in **Russian**.
-  - `README.md` and other human-facing top-level docs — **Russian**.
-- `USER-RULES.md` and `memory.md` (project root) — additional rules; on conflict they override or extend this file. If a referenced file is unreachable, stop and tell the user instead of proceeding with a degraded ruleset. This rule applies to files that this document hard-requires (`mcp-1c-tools` skill, the on-demand rules in `content/rules/` referenced from sections below) — not to optional artifacts whose absence is explicitly handled (e.g. `openspec/project.md` above, `LLM-RULES.md` below).
-- `LLM-RULES.md` (project root) — the agent-maintained self-improvement layer: behavior rules distilled from observed friction and approved by the user, written **only** by the `/evolve` command (`content/commands/evolve.md`). Read it together with this file when present. Precedence on conflict: `LLM-RULES.md` overrides this file and the on-demand rules; `USER-RULES.md` and `memory.md` override `LLM-RULES.md`. Absence of the file = no accumulated rules yet, **not** an error. Capture and recommendation discipline — `## Rules self-improvement` below.
+- Project context: `openspec/project.md` when present. Settings: `.dev.env` — never guess or duplicate values; ask only for one the current operation needs (`content/rules/dev-standards-env.md`).
+- Read root `USER-RULES.md`, `memory.md` and, when present, `LLM-RULES.md`; precedence `USER-RULES.md`/`memory.md` → `LLM-RULES.md` → this file and on-demand rules. Unreachable required rule → report the gap, stop only dependent work.
+- **Language:** rules and `content/` prose — English; BSL identifiers/comments/literals, metadata synonyms, user-facing strings, replies and top-level human docs — Russian.
+- Monthly: on the first non-trivial task check `.ai-rules.json` `lastUpdatesCheckAt` (else `updatedAt`/`installedAt`); missing or over 30 days → `content/rules/support-feedback.md §4`, read-only `/checkupdates` once at the end, never auto-update.
 
 ### Path convention — source vs. installed copies
 
-Any reference of the form `` `content/rules/<name>.md` ``, `` `content/agents/<name>.md` ``, `` `content/skills/<name>/SKILL.md` ``, `` `content/commands/<name>.md` `` means **either** the source-repo path (when running inside the `1c-rules` source repo) **or** the installed copy under the active tool's canonical rules directory (`.cursor/rules/`, `.claude/rules-1c/`, `.codex/rules/`, `.opencode/`, `.kilo/rules-1c/`, `.kimi-code/rules-1c/`, `.qwen/rules-1c/`, `.commandcode/rules-1c/`, `.cline/rules-1c/`, `.pi/rules-1c/`, `.ai-agent/rules/`). The extension may change on install (Cursor: `content/rules/<name>.md` → `.cursor/rules/<name>.mdc`) — in an installed project match by file name, not extension. The active tool reads the installed copy; rule files keep source-repo paths for portability. This convention applies globally — individual rule and subagent files do not repeat the disclaimer.
+`content/rules/<name>.md`, `content/agents/<name>.md`, `content/commands/<name>.md`, `content/skills/<name>/SKILL.md` name the source or the active tool's installed copy — match by file name (Cursor `.mdc`), never a second vendor tree. `standards(name="<name>")` comes **only** from 1C-docs-mcp; disk routers hold headings, no URL/local fallback (`content/rules/help-corpus-retrieval.md`).
 
 # Tooling & Standards
 
 ## MCP Tool Calling
 
-The single source of truth for MCP server catalog, task→tool mapping, and fallback order is the **`mcp-1c-tools`** skill (`content/skills/mcp-1c-tools/SKILL.md`). Load it before choosing 1C MCP tools; load the matching `content/skills/mcp-1c-tools/docs/<server>.md` only for parameter-rich calls or when arguments are not obvious. A server counts as available only when its tools are exposed in the current session.
-
-Step-by-step playbooks per task type (writing code, review, architecture, error fixing, performance, refactoring, metadata XML, forms, integrations, documentation, platform-version comparison) live in `content/rules/tooling-playbooks.md`.
+**Hard gate:** before the first 1C MCP call (per session; per run for a subagent) and before writing or reviewing BSL/metadata, 1C spec or memory operation — even with no server exposed — read `content/rules/mcp-policy.md` in full, then `content/skills/mcp-1c-tools/SKILL.md` and the operation skill it names. The policy owns tool policy, availability, fallbacks and server answers; the index below uses its numbers and never replaces it. Acting without it is a defect.
 
 ### A. Priority and obligation
 
-1. **Mandatory scope.** MCP calls are mandatory only for risk-bearing 1C work when a relevant server is exposed: BSL / metadata edits or review, metadata XML, forms, integrations, refactoring, performance, runtime errors, platform API checks, impact analysis, syntax / quality validation, project-memory operations, **and OpenSpec spec authoring whenever the artifact references concrete 1C facts** (metadata names, attributes, tabular sections, public API signatures, БСП subsystems, platform-version behaviour, project conventions — see the spec-authoring path in `## Development Procedure → Triage` and `content/rules/sdd-integrations.md`). Generic Markdown / rules / documentation work that makes no such factual claims does not require 1C MCP calls; validate structure, links, paths, and internal consistency instead.
-2. **Conditional external knowledge.** Use platform docs, БСП / SSL, and ITS MCP tools when the task depends on versioned platform behavior, reusable БСП APIs, or standards compliance. Do not call them for generic prose cleanup or rule-file editing unless such a fact is actually needed.
-3. **Verify before writing BSL / metadata / specs — scoped hard gate.** Use the minimum evidence set from `tooling-playbooks`: quick-fix BSL edits use only the directly relevant code / syntax context; full-cycle BSL changes use templates, existing project code, metadata, and platform / БСП / ITS docs when those sources affect correctness; metadata XML / form changes use schema, examples, and metadata validation; **OpenSpec spec authoring** uses `recall` for prior project notes plus the MCP tools that confirm every 1C fact the spec references (metadata / code search for object shape, platform / БСП / ITS docs for API and standards) — see `content/rules/sdd-integrations.md`. In the final answer for any non-trivial BSL / metadata change **or non-trivial OpenSpec spec authoring (proposal / design / tasks / delta specs that reference real 1C objects, APIs, or БСП subsystems)**, list the context sources actually used and briefly state why any normally relevant source was skipped. Skipping a relevant source silently counts as a defect.
-4. **No blind chaining.** Every MCP call must close a concrete context gap. Follow the fallback order from `mcp-1c-tools`; do not duplicate calls or continue the chain after you already have enough evidence. If a search / navigation call on `edt-mcp` (e.g. `get_metadata_objects`, `search_in_code`) returns empty / non-actionable results twice on substantially different queries for the same target, reformulate (broader or narrower terms, a different tool such as `get_module_structure` or `find_references`) instead of repeating the same call. Before using **any native discovery tool** on 1C project source — `Grep` / `rg`, `Glob` / file search by pattern (`**/*.bsl`, `**/*.xml`), directory listing, semantic codebase search, `Read`-scanning of modules to locate something, or a full-module `Read` made just to find / understand one routine (prefer `get_module_structure` / `read_method_source` / `search_in_code`) — first exhaust the project-index search path from `mcp-1c-tools` and state why those attempts were insufficient. "Getting oriented" by globbing source trees or bulk-reading modules while project-index MCP servers are exposed is the same defect as a silent `Grep`. **The priority is bounded, not a ban:** when the project-index servers are not exposed, native tools apply immediately (state it once, in one line); when a tuned attempt returned nothing relevant, or the index is stale against fresh local edits, falling back to native search / reading is the correct next move — burning further MCP calls just to satisfy this rule is itself blind chaining. Reading your direct edit target or a file already located via MCP is normal work, not a fallback; the full boundary list — `content/rules/mcp-first-search.md`.
-5. **Validate changed 1C code.** After BSL / metadata edits, run the validation chain on `edt-mcp` — refresh the markers of what you touched (`revalidate_objects`, plus `validate_query` for any new query text) → read the findings (`get_project_errors`, scoped by `objects` and sliced by `severity`, explained by `get_check_description`) → confirm with `get_problem_summary` — within the verification budget defined in section B below. `write_module_source` runs a BSL syntax check **before** writing, so a successful write already covers part of the first step. Metadata is validated the same way (`revalidate_objects` → `get_project_errors` on the changed FQNs); there is no XSD / raw-XML validator on `edt-mcp`. Metadata **mutations** go through the `1c-metadata-manage` skill per the hard gate in `## Skills and Subagents` — hand-editing outside its documented exceptions is a defect, not a stylistic choice. Details — `content/skills/mcp-1c-tools/docs/edt-mcp.md`. **Coverage gaps:** no dedicated prose code-review tool (`get_project_errors` / `get_problem_summary` are marker-based), and no AI per-method analysis — compensate on risk-bearing changes with the internal review checklist in `dev-standards-code-style.md §8`. A project running the classic docker distribution instead of `edt-mcp` uses `syntaxcheck` → `check_1c_code` → `review_1c_code` here, and `verify_xml` for metadata XML.
-6. **ITS documents.** This fork's default server set has no `its_help`/`fetch_its` (those come from the upstream `1c-code-check-mcp` server, not run by default here — see `content/skills/mcp-1c-tools/docs/v8std.md`). Use `v8std-local` (`v8std_search` / `v8std_explain_diagnostics` / `v8std_explain_snippet` / `v8std_get_page` / `v8std_get_related`) for ITS standards search and standard↔diagnostic mapping (ACC/АПК, BSLLS, EDT, v8-code-style). If a project still runs `1c-code-check-mcp`, `its_help` → `fetch_its` remains valid for every returned document ID. State explicitly when an ITS-standards claim could not be verified via MCP (neither tool exposed in the session).
-7. **Platform-capability check before custom implementations in specialized domains.** When a task requires a capability beyond plain business logic — cryptography / digital signatures, solving systems of linear equations (СЛАУ) and other numerical methods, data analysis / machine learning, the collaboration system and its bots (СистемаВзаимодействия), integration buses / message queues, full-text search, regular expressions, and similar unique platform features — first ask the platform documentation MCP whether the platform already ships such a mechanism (`1C-docs-mcp`: `docsearch` by capability description → `docinfo` for every exact name found), and check БСП via `ssl_search` where a library-level solution is plausible. **Model memory is not evidence of absence** — these mechanisms are exactly what training data tends to miss, while the docs MCP indexes the real platform documentation. **When a platform or БСП mechanism is found and usable — use it** as the foundation (types, methods, subsystems, virtual tables); custom code only for glue, parameters, and project wiring — **do not** design a parallel home-grown equivalent. **Near-fit is not a rejection.** If the found mechanism covers the core need but seems slightly inconvenient (awkward API, extra conversion step, partial coverage that can be closed with thin glue code) — that is **not** grounds to hand-roll. On a genuine partial-fit fork (the mechanism covers most but not all of the requirement), raise a `CONFUSION` block — platform mechanism + glue vs. full custom implementation, with trade-offs — and let the user decide; **when asking is impossible** (autonomous / batch run, no operator) — **default to the platform mechanism** and note the residual gap in the final answer. Rejecting a found mechanism on your own authority is allowed only for hard evidence: platform version / `РежимСовместимости` incompatibility or a doc-confirmed functional mismatch with the core requirement — **state the reason** in the final answer. Hand-rolling without the capability check is a defect; hand-rolling when a usable mechanism was found is also a defect. Query patterns and the domain trigger list — `content/skills/mcp-1c-tools/docs/1C-docs-mcp.md → Platform capability discovery` and *Using a found platform mechanism*.
-8. **`templatesearch` `query` formulation — applies to this tool only.** The task-description rule applies **exclusively** to the **`templatesearch`** tool on `1c-templates-fastcode`. It does **not** govern `query` on `docsearch`, `search_in_code`, `get_metadata_objects`, `ssl_search`, `recall`, or any other MCP tool. Before the first **`templatesearch`** in a session, load `content/skills/mcp-1c-tools/docs/1c-templates-fastcode.md → Query formulation (templatesearch only)` and run its pre-flight on every **`templatesearch`** call: pass the user's task text verbatim; keyword salad (e.g. `уровень иерархии … запрос КОЛИЧЕСТВО`) is a defect equal to skipping the tool.
-9. **`templatesearch` — reuse, do not reinvent.** When **`templatesearch`** returns a template that solves the same task (same goal, acceptable algorithm / query shape) — **start from that template**: take its code or query as the base and adapt only what the task requires (metadata names, field list, filters, module placement, call site). **Do not** rewrite the same solution from scratch when a fitting template is already in hand. Ignoring a matching template and hand-rolling an equivalent is a defect. If you adapted non-obvious parts, note briefly what changed and why. **Disposition (lightweight, goal-matching templates only):** when a template is used as the base — name it in one line in the final answer (`Template: <name> — used as base`); when nothing fits — one short «no fitting template» note is enough. No per-candidate analysis of everything the vector search returned. A delivered solution that shares no recognizable structure with a goal-matching template found during the task is defective and must be redone from the template; valid rejection reasons are narrow (doc-confirmed version incompatibility, explicit user requirement) — «I'd rather write it differently» is not one. Canon — `content/skills/mcp-1c-tools/docs/1c-templates-fastcode.md → Using a found template` (incl. *Template disposition (lightweight)*).
+1. **Scope:** risk-bearing 1C work, memory and 1C-fact specs use the relevant exposed tools; prose-only edits get structural checks.
+2. **External knowledge:** platform/БСП/ITS only when their facts matter.
+3. **Evidence:** minimum set per `content/rules/tooling-playbooks.md`; confirm 1C facts before writing; disclose gaps.
+4. **Search:** `content/rules/mcp-first-search.md` before searching 1C sources.
+5. **Validation:** `revalidate_objects` (+ `validate_query` for query text) → `get_project_errors` → `get_check_description` / `get_problem_summary` at the active depth; metadata — the same on the changed FQNs.
+6. **ITS:** `v8std-local` (`v8std_search`, `v8std_explain_diagnostics` → `v8std_get_page`); state when a claim is unverified.
+7. **Platform first:** before a custom specialized mechanism — `docsearch` → `docinfo` (+ `ssl_search`); build on a find; partial fit → `CONFUSION`; reject only for documented incompatibility, stated.
+8. **`templatesearch`:** task text or a same-goal paraphrase, never keywords.
+9. **Template reuse:** a fitting template is the base; reject only for a named reason; report its disposition.
 
 ### B. Limits and non-determinism
 
-1. **Verification budget — one clean pass on the latest artifact state; up to 3 calls per validator only after a blocking defect.** Applies separately to the three diagnostics steps from `A.5` (`revalidate_objects`/`validate_query`, `get_project_errors`, `get_check_description`/`get_problem_summary`) when validating BSL / metadata changes. A **cycle** = one logical edit of one module; every new behavioural edit starts a new cycle.
-   - **Blocking defect** — any `ERRORS` / `BLOCKER` / `CRITICAL` finding from `get_project_errors` (or a syntax rejection from `write_module_source` / `validate_query`); or a logic, metadata, data-integrity, security, transaction / lock, or performance-critical defect visible in the findings.
-   - **Confirmation after a fix is mandatory.** When source is edited to fix a blocking defect, re-run that step against the changed state. Under `full`, the initial call plus at most two confirmation calls are allowed (3 total). Calling the validator again on unchanged content remains forbidden.
-   - **Non-blocking findings do not start a retry loop.** `MINOR` / `TRIVIAL` findings — style, naming, formatting, missing comments — do not justify re-running `revalidate_objects` / `get_project_errors`. If fixing such a finding changes BSL, refresh the final `revalidate_objects` evidence; re-run an analysis step only when the edit can affect the behaviour it validated.
-   - **After the limit** — if the latest artifact state has no clean confirming pass and a blocking defect may remain, the gate failed: do not declare the change done. Report the artifact and step as unverified; style warnings alone remain non-blocking.
-   - **Depth modulation (`VERIFICATION_DEPTH`).** The budget above describes the default `VERIFICATION_DEPTH=full`. `standard` normally uses one clean pass and allows exactly one mandatory confirmation after a blocking fix (2 calls total, no open-ended retry loop); `lite` keeps the syntax / diagnostics step mandatory under the same confirmation rule but runs `get_project_errors` / `get_check_description` only for high-risk (promotion-trigger) changes or on explicit request. Promotion-trigger paths always get the `full` budget regardless of the level. Canon — `content/rules/verification-policy.md → "Verification depth levels"`; toggled by the `/litemode` command.
-   - **Pure metadata changes (no BSL touched)** — the style / summary slice is usually irrelevant; run `revalidate_objects` + `get_project_errors` scoped to the changed FQNs once, and skip the rest unless the metadata change embeds BSL (object / manager module, form module, fill-check expression, predefined-item population). The syntax step is still run on any BSL module touched, even indirectly (e.g. a form module generated together with the form).
-   - Markdown / rules / documentation edits use the docs-fix path checks instead.
-   - A project running the classic docker distribution instead of `edt-mcp` applies the same budget/depth rules to `syntaxcheck` / `check_1c_code` / `review_1c_code` / `verify_xml`.
-2. **AI-authoring MCP tools, where the session exposes any, are non-deterministic.** Treat generated code / metadata drafts from any AI-authoring tool as drafts, not authority. Re-validate output via the full diagnostics chain from `A.5` before delivery (subject to the budget above).
+1. One clean pass on the latest state; a blocking fix needs confirmation within `content/rules/verification-policy.md` budgets; no loops for style noise; unconfirmed = unverified.
+2. AI rewrites and answers are drafts; validate before delivery.
 
-### C. Call discipline (no duplication)
+### C. Call discipline
 
-1. **Every call must add information that is not already available.** Before each call, mentally check what is missing from the collected context and how this call closes that gap. If the answer is "nothing missing" or "just to be safe" — do not call.
-2. **No-change repeats are forbidden.** Do not repeat the same tool request against the same unchanged state when the previous result is still available: same search, same MCP query, same validator input, or same file contents. A repeat is allowed when parameters change substantially (different query, different object, different depth), state changed (file edit, generated output, new checkout, resumed session, user edited the file), or freshness matters before a destructive action / final verification. Do not re-run `get_project_errors` / `get_check_description` if the code has not changed since the last run.
-3. **Tune each query to the tool's schema.** Parameter-rich `edt-mcp` tools (e.g. `search_in_code`, `get_metadata_objects`, `get_method_call_hierarchy`, `find_references`, `get_project_errors`) usually accept several optional filters, and defaults are not always the best starting point. Consult the tool's live schema before such a call and set the filters that actually narrow the result (object / module scope, direction, depth, name pattern) rather than calling with bare defaults. If the first call returns nothing, reformulate (broaden / narrow scope, switch to a related tool) before falling back further. **This rule is about call quality — it does not relax the obligation to make the call.**
-4. **Prefer structural tools over manual grep.** `get_module_structure`, `read_method_source`, `get_method_call_hierarchy`, `find_references` for code navigation — before falling back to substring search.
-5. **Do not invent parameter names — the live tool schema is authoritative.** Claude Code exposes each MCP tool's real JSON schema at call time; use exactly the parameter names and shapes shown there, never a "natural-sounding" alias guessed from the tool name or from a different server's convention. When a parameter-rich call is rejected as `Missing required argument` / `Unexpected keyword argument`, re-read the schema before retrying — do not paraphrase the parameter and do not retry with another guessed alias. This fork intentionally does not maintain a hard-coded parameter cheat-sheet for `edt-mcp` (its surface is large and evolves with the tool itself); a stale guessed cheat-sheet would be worse than none. Coverage gaps and naming caveats — `content/skills/mcp-1c-tools/docs/edt-mcp.md`. A project running the classic docker distribution instead should still sync parameter names against `mcp-1c-tools/docs/<server>.md` before any call whose parameter names are not obvious.
-   - If a Pydantic / schema validator rejects the call as `Missing required argument` or `Unexpected keyword argument`, re-read the server's docs file before retrying — do not paraphrase the parameter and do not retry with another guessed alias.
+1. Each call closes a gap; no repeats on unchanged state; independent opening calls go in one parallel batch.
+2. Tune parameter-rich queries; reformulate a miss once.
+3. Structural tools before substring search or full reads.
+4. Argument names come from the live tool schema (`get_tool_guide`), never guessed.
+5. A typed server answer maps to an action by its code (`mcp-policy` C); never re-probe the same gap via sibling tools.
 
 ## Coding Standards
 
-Before writing or reviewing BSL or metadata, load `content/rules/coding-standards.md` — it is the single index of the detail files and the canonical place that lists them.
+Before writing or reviewing BSL/metadata, load `content/rules/coding-standards.md`; it routes domain rules and `standards(name=…)` — load only what applies.
 
 ## Skills and Subagents
 
-- **1C metadata — hard gate, not a preference.** Any **mutation** of metadata structure (creating / editing / removing configuration objects, forms, reports, layouts, roles, extensions, databases) is executed **through the `1c-metadata-manage` skill** (or the `1c-metadata-manager` subagent): read its `SKILL.md`, dispatch to the domain doc, drive the change with the skill's tools. Hand-editing metadata XML / `Form.xml` / MXL while the skill is available is a **defect** — same standing as a skipped validator — with exactly the narrow exceptions defined in `content/skills/1c-metadata-manage/SKILL.md → Hard rule` (unambiguous one-line fix; skill not available in the session — state it once). The surrounding MCP evidence set stays mandatory per `content/rules/tooling-playbooks.md` (`edt-mcp`: `get_metadata_details` / `get_objects_by_tags`/`get_tags` / `get_form_layout_snapshot` before, `revalidate_objects` + `get_project_errors` after; classic docker distribution: `search_forms` / `inspect_form_layout` / `get_xsd_schema` before, `verify_xml` after). In the final answer of any task that mutated metadata / forms / layouts, state the path in one line: `Metadata tooling: <skill tool / subagent used>` or `hand-edit — <exception>`.
-- **1C infobase operations — same hard gate.** Any operation against an infobase — creating / running it, loading or dumping the configuration, updating the DB structure (`/UpdateDBCfg`, `ibcmd infobase config apply`), web publication — is executed through the matching slash-command procedure (`/update1cbase`, `/loadfrom1cbase`, `/getconfigfiles`, `/deploy-and-test`, `/initproject`, `/restore-testbase`, `/test-fix-loop`, `/build-release`) or the `1c-metadata-manage` skill's `db-ops` / `web-ops` tools. Composing an ad-hoc `1cv8.exe` / `ibcmd` command line from memory while these are available is a **defect**: the command procedures and scripts encode what ad-hoc lines lose — parameter escaping, `/Out` log capture, log parsing for errors hidden behind exit code 0, session termination, safety confirmations, and the **iterative retry discipline** (log check → terminate a hung / failed Configurator → fix → re-run; canon — `content/commands/update1cbase.md → Update retry loop`). In the final answer of any task that ran an infobase operation, state the path in one line: `IB tooling: <command / db-ops script>` or `ad-hoc — <reason: command and skill unavailable>`.
-- **1C configuration repository (хранилище) — same hard gate, active only when bound.** `.dev.env` `REPOSITORY_PATH` set = the project works with a configuration repository: every repository operation runs **through the `1c-repository-manage` skill** (`content/skills/1c-repository-manage/SKILL.md`), and mutations of configuration objects follow its lock-before-edit / commit-after-verify discipline (`docs/repo-sdlc.md`) — including `1c-metadata-manage` mutations and `/update1cbase` loads. Ad-hoc `1cv8.exe /ConfigurationRepository*` lines are a **defect**; force and lock conflicts follow the skill's safety invariants. **Unbind is forbidden while bound:** never disconnect the configuration from the repository (`/ConfigurationRepositoryUnbindCfg` or any equivalent) — not as a workaround for lock conflicts, read-only objects, or a failed load, and not because the user asked to "just unbind so we can edit". A refusal is the correct outcome. Never route around it by emptying `REPOSITORY_PATH`. Empty `REPOSITORY_PATH` = inactive, never raised up front. Trail line in the final answer: `Repository tooling: repo-ops <operations>`.
-- **Vendor support state — a refusal is a correct outcome.** The skill's mutating tools refuse to edit an object of a typical configuration that is on vendor support and locked ("на замке"), and refuse to delete one not yet taken off support; the run exits non-zero with a diagnostic. **Never route around it** by hand-editing the XML — direct edits silently break future vendor updates, and the hand-edit exceptions above do not cover this case. The default answer is a change **in an extension** (`cfe-borrow` / `cfe-patch-method`); changing support state deliberately is the skill's `support-edit` tool, and it is a decision to state in the report (which object, `editable` / `off-support`, why an extension was not the answer). Canon — `content/skills/1c-metadata-manage/docs/support-manage.md`.
-- **Communication style and Tone & Output** — **`caveman`** skill (`content/skills/caveman/SKILL.md`). By default (`.dev.env` `CAVEMAN=on`) active for **all** tasks. `CAVEMAN=auto` restricts it to development tasks (writing / editing / refactoring code, fixing bugs, deploying) and turns it off for analysis, documentation, review and audit tasks; `CAVEMAN=off` disables auto-activation. Toggled by the `/caveman on|auto|off` command (`content/commands/caveman.md`); the parameter is documented in `content/rules/dev-standards-env.md`. Levels, safety switches and boundaries are defined inside the skill file. Session-only force (phrases "caveman please" / "stop caveman", `/caveman lite|full|ultra`) works in every mode.
-- **Subagents** — when a task feels large / multi-step / multi-module and may be worth delegating — read `content/rules/subagents.md` and decide whether to delegate or execute directly. Full subagent prompts live in `content/agents/`; file names omit the `1c-` prefix and are listed in the mapping table in `content/rules/subagents.md`. If `.dev.env` has `ORCHESTRATION=economy`, delegation of execution is the default — load `content/rules/orchestrator-economy.md` together with `subagents.md`.
-- **Exploration — project `1c-explorer` only (hard gate).** When delegating read-only codebase / metadata exploration (locate code, map a subsystem, impact / callers, "where is X / how does Y work"), launch the project's **`1c-explorer`** subagent (`content/agents/explorer.md`, installed as the tool's custom agent — e.g. `.cursor/agents/explorer.md`). **Never** use the host tool's built-in Explore / `explore` / generic scout (Cursor Task `subagent_type: "explore"`, and equivalents). Built-ins cannot be overridden and do not follow the MCP-first chain or 1C report format — using them for project exploration is a defect. Narrow lookups the parent can answer with one direct MCP / read stay on the parent (no subagent). Canon — `content/rules/subagents.md → Host-tool built-in explorers`.
-- **Subagent obligations.** Every subagent inherits the rules of this file unless its own prompt explicitly overrides one. Concrete shared obligations (CONFUSION format, MCP-first search, verification checklist for mutating work) are spelled out in `content/rules/subagents.md → Common obligations` and pointed to from every agent prompt. On material forks, subagents MUST raise the `CONFUSION` block instead of silently picking one interpretation, returning a partial result, or paraphrasing the question into prose; low-risk ambiguity follows the assumption-and-proceed rule from `Development Procedure → 1`.
-
-### Supplementary skills (load on demand)
-
-These skills are not always-on; load them by trigger from the table below. Each skill lives at `content/skills/<name>/SKILL.md`. A skill counts as available only when it is actually exposed in the current session.
-
-| Skill | Load when |
-|---|---|
-| **`powershell-windows`** | Writing or running shell commands on Windows (slash commands, scripts, deploy / IB flows). Required by the shell-using subagents (`developer`, `tester`, `error-fixer`, `refactoring`, `planner`, `architect`, `analytic`). |
-| **`1c-repository-manage`** | `.dev.env` `REPOSITORY_PATH` is set and the task mutates configuration objects or runs IB config operations; or the task/user mentions the configuration repository (хранилище конфигурации). Hard gate above; SDLC discipline — the skill's `docs/repo-sdlc.md`. |
-| **`mermaid-diagrams`** | Producing diagrams (architecture, flows, ERD) for plans, designs, PRDs, code maps. |
-| **`handoff`** | Compressing the current chat into a self-contained handoff document for the next session. Default path: `handoffs/handoff-<timestamp>.md`. |
-| **`prompt-enhancer`** | Turning a short / unstructured note or ТЗ into a numbered imperative spec. Does not add new requirements. |
-| **`transcribe`** | Transcribing audio / video (Gemini API): transcript with timecodes, optional summary, `--analyze-ui` for screen recordings. |
-| **`md-to-docx`** | Converting Markdown into `.docx`. Requires Node.js and the `docx` package. |
-| **`img-grid-analysis`** | Extracting column proportions from screenshots / scans of printed forms for MXL layouts. |
-| **`v8unpack-cf`** | An ordinary form (обычная форма) — `Ext/Form.bin`, no `Form.xml` — or a CF / CFE / EPF binary, **without the 1C platform**; for platform-based extraction use `getconfigfiles`. |
+- **Metadata mutations:** `content/skills/1c-metadata-manage/SKILL.md` or `1c-metadata-manager`; hand edits only within the skill's exceptions, context checked before, validation after. On EDT projects (`USE_EDT=true`) the path is the typed `edt-mcp` API; never hand-edit `*.mdo` / `*.form` (`edt-workflow`).
+- **Infobase operations:** matching command procedure or `db-ops`/`web-ops`, never ad-hoc `1cv8.exe`/`ibcmd`; keep escaping, logs, sessions and retries (`content/commands/update1cbase.md`; EDT alternative — `edt-workflow`).
+- **Configuration repository:** `REPOSITORY_PATH` set → `content/skills/1c-repository-manage/SKILL.md`: lock before edit, commit after verify; never unbind or clear the setting to bypass locks, even on request.
+- **Vendor support:** never bypass a locked-object refusal with XML edits; prefer an extension; `support-edit` only as a stated decision (`content/skills/1c-metadata-manage/docs/support-manage.md`).
+- **Delegation:** `content/rules/subagents.md` (+ `content/rules/subagent-pipeline.md` for delegated full-cycle, `content/rules/orchestrator-economy.md` when `ORCHESTRATION=economy`); subagents inherit these gates and `content/rules/subagent-core.md`. Exploration — project `1c-explorer` only, never a host's generic explorer.
+- **Style and helpers:** `CAVEMAN` → `content/skills/caveman/SKILL.md` (code, evidence, errors and safety steps stay exact); Windows shell → `powershell-windows`; other skills load by description.
 
 # Discipline
 
 ## Project memory
 
-Two layers — `memory.md` (strict long-term store at project root) and `1c-templates-mcp` `remember` / `recall` (fine-grained vector memory). Every project-specific note must land in one of them, otherwise it is lost between sessions.
-
-- **`memory.md`** — only rules that are **all** of: global (whole project), critical (violation = production breakage / data leak / regulatory issue), stable (does not change task-to-task), non-derivable (cannot be inferred from `AGENTS.md`, `USER-RULES.md`, or official docs). Do not store TODOs, temporary agreements, style notes, or subsystem-scoped rules.
-- **`remember` / `recall`** — primary store for everything else worth keeping: user corrections during work, non-obvious project-specific facts, recurring errors and fixes, naming and quirks of individual configuration objects, **and standing working conditions** — statements by the user that shape future tasks, not just the current one ("I am benchmarking the agent", "objects from task statements may not exist in the configuration", "always prefer built-in platform mechanisms"). Call `remember` proactively and **in the same turn** where the user corrects you, clarifies a non-obvious detail, or states such a condition — deferring the save loses it; the test is *"would the next session behave differently if it knew this?"*. Call `recall` at the start of any non-trivial task with key terms (object name, subsystem, error message); on the first non-trivial task of a session also query for standing conditions (`working conditions`, `benchmark`, `conventions`). Write notes in English, one self-contained fact per note, preserving original 1C identifiers and object / module names as-is. No secrets / PII.
-- **Memory gates (hard).** Two checks that close the most common failure — memory tools silently skipped:
-  - **Correction-capture gate.** A turn in which the user corrected your output, rejected an approach, clarified a non-obvious fact, or stated a standing condition is **incomplete** until `remember` was called with that fact (fallback: a dated entry appended to `memory.md` when the server is unavailable). Run the check before ending the turn — "did this message change how I (or the next session) should work? → saved?". Answering the correction while skipping the save is a defect, even if the reply itself is right.
-  - **Recall-first gate.** For any non-trivial 1C task, `recall` (task key terms; plus the standing-conditions query on the session's first task) comes **before** solution design — same standing as `templatesearch`. In the final answer of such a task, state memory usage in one line: `Memory: recalled <n> notes / nothing relevant; saved <n> notes / nothing to save`. Skipping `recall` when the server is exposed is a defect.
-- **Availability.** Treat `1c-templates-mcp` as available only if the current session actually exposes `remember` / `recall` tools — presence in the client's MCP config alone is not enough. If the server is offline or the tools are missing from the schema, append even small particular-case corrections as dated entries directly to `memory.md` (eligibility criteria are temporarily relaxed) and migrate them to `remember` once the server is back.
-- **Promote / demote.** A note saved via `remember` that later proves to meet all four `memory.md` criteria — promote to `memory.md` and remove the original. The same fact must not live in both stores.
+1C changes and corrections → `content/rules/project-memory.md`. Recall before design (scope by triage); save corrections in the same turn; no secrets/PII.
 
 ## Rules self-improvement (`/evolve` + `LLM-RULES.md`)
 
-`LLM-RULES.md` at the project root accumulates user-approved corrections of **agent behavior** (precedence — `## Project info`). Only the `/evolve` command writes it; aggregation algorithm, evidence threshold, protected areas, approval gate, and entry format — `content/commands/evolve.md`. This section owns only the always-on part:
-
-- **Capture friction, never fix rules inline.** A friction episode is one of: the user corrects behavior that a rule mandated; a mandated step is demonstrably redundant for this project (produces no information task after task — not merely inconvenient); two rules conflict on the same behavior; the user asks for a permanent behavior change ("always…", "never…", "запомни…"). Record one `remember` note per episode, prefixed `rule-friction:` — target behavior / rule, what happened, date (fallback per `## Project memory` — a dated entry in `memory.md`). Routing: project **facts** go to plain `remember` notes; **behavior / process** corrections get the `rule-friction:` prefix. Do not edit `AGENTS.md`, the rule files, or `LLM-RULES.md` on the spot.
-- **Recommend `/evolve`** when ≥ 2 friction signals accumulate for the same behavior or the user asks for a permanent behavior change — one line at the end of the answer, at most once per session. Never run it unasked. A defect in a **shipped** rule or MCP server is not friction — that route is `/support` (`support-feedback.md`).
-
-## Editing discipline
-
-Keep edits small and focused; one logical change per edit. Prefer minimal, reversible changes; avoid refactors unless explicitly required. Per-task tool sequences — `content/rules/tooling-playbooks.md`.
+Only a user-requested `/evolve` writes `LLM-RULES.md`. Friction → `rule-friction:` memory note, never an unsolicited rule edit; recommend `/evolve` at most once per session, after two signals for one behaviour or a permanent-change request. Product defects → `content/rules/support-feedback.md`; maintaining this source ruleset is ordinary work.
 
 # Additional rules (load on demand)
 
-Load the corresponding file when the task matches the rule's scenario. Each entry below is a routing cue only; the authoritative scope description is the frontmatter `description` inside the file itself. Every rule lives at `content/rules/<name>.md`.
+Load `content/rules/<name>.md` on its trigger only; routers pull companions and domain standards.
 
-## Development standards
-
-- **coding-standards** — index of code-style detail files; load before writing or reviewing code.
-- **dev-standards-core** — compatibility router for the focused development-standard rules below; load only when following a legacy reference.
-- **dev-standards-env** — `.dev.env`, infobase / deployment, UI testing, subagent models, orchestration, and process-tuning parameters; load only when the current task depends on one of them.
-- **dev-standards-code-style** — BSL formatting, quality limits, forbidden constructs, naming, public API documentation, typography, comments, and internal review; load for BSL writing or review.
-- **dev-standards-change-markers** — typical-code modification markers, metadata naming, and object-type selection; load when modifying typical code or creating / naming metadata.
-- **dev-standards-architecture** — architecture patterns, extensions, platform standards, code smells; load for architectural decisions or cross-module review.
-- **module-structure** — canonical region templates per module type; load before creating or restructuring a module.
-- **extension-patterns** — CFE interceptors, `ПродолжитьВызов`, change markers, adopted-object constraints; load for extension code.
-- **dcs-design** — СКД report design; load when designing or reviewing a DCS-based report.
-- **dcs-advanced-composition** — two-pass СКД preprocessing (filtering detail records before roll-up) and direct query execution instead of the DCS engine; load only when the override of `dcs-design.md §5` is not enough.
-- **bsp-access-rights** — programmatic БСП access-group profiles (`Роли.Роль` is a reference; extension roles) and the right / role / RLS check API; load when code creates, assigns, or checks access rights.
-- **registers-design** — register design (dimensions, resources, periodicity, indexing, posting); load when creating or restructuring a register.
-- **query-design** — router for query work; load first for any non-trivial query.
-- **logging-strategy** — when / what / how to log, severity, category naming, secrets / PII bans; load when adding logging for integrations, background jobs, or transactional rollback.
-- **locks-and-transactions** — managed locks, transaction boundaries, deadlock prevention; load for posting / multi-document operations, lock conflicts, or extending a transactional path.
-
-## Model adaptation
-
-- **model-adaptation** — router of the active-model layer: `AGENT_MODEL` resolution, accepted spellings, what a profile may / may not change, and the model-agnostic prompting baseline; load when you need the contract, when `/rulesmodel` runs, or when a profile seems to conflict with a base rule.
-- **model-opus5** / **model-sonnet5** / **model-fable5** / **model-gpt56** — behaviour profiles for Claude Opus 5, Claude Sonnet 5, Claude Fable 5 (Mythos 5) and GPT-5.6; load exactly the one matching the running model, once per session.
-
-## Subagents
-
-- **subagents** — subagent catalog, delegation rules, common obligations, model-tier routing, task templates; load when a task may be worth delegating.
-- **subagent-pipeline** — full-cycle pipeline (planner → developer → spec-compliance review → optional user-requested code review → verification gate); load for full-cycle tasks delegated to subagents.
-- **orchestrator-economy** — economy mode (`ORCHESTRATION=economy` in `.dev.env`, toggled by `/economymode`; a user phrase overrides for the session): parent delegates execution, keeps decisions and verification; load when the mode is on or asked about.
-
-## Forms
-
-- **forms** — router for all managed-form work; load first for any form task.
-- **forms-add** — creating or significantly altering a form (`Form.xml` + module) plus form-presentation rules.
-- **form-patterns** — layout archetypes, naming conventions, advanced ERP patterns; load when designing a layout from scratch or when placement is unspecified.
-- **form-module** — form-module code: event-handler wiring, reserved property names; load when editing form-module logic or adding event handlers.
-- **async-methods** — `Асинх` / `Ждать` / `Обещание` (8.3.18+); load for client-side async code.
-
-## Tooling
-
-- **tooling-playbooks** — step-by-step MCP playbooks per task type; load at the start of a matching task; for any refactoring — before touching the first line.
-- **mcp-first-search** — MCP-first search discipline (graph → code-metadata → `grep=true` retry → `Grep`) with a mandatory "what was tried" note; covers every native discovery tool; load before any search on 1C project source.
-- **help-corpus-retrieval** — how to fetch the routed standards from the `1c-standards` collection of `1C-docs-mcp` (the `standards` tool, names, paging, outage policy); load when following a "Where this standard lives" pointer.
-- **ui-testing-tools** — browser / desktop automation for UI tests (`agent-browser` → built-in browser MCP → `Windows-MCP` last resort) with a **mandatory preflight**; load before `/deploy-and-test` Step 4 / `1c-tester`.
-- **edt-workflow** — the 1C:EDT branch (`.dev.env` `USE_EDT=true`): source format, MDO metadata mutations, EDT-MCP routing, model↔disk sync, EDT validation, DB update; load before metadata / IB / search work in an EDT project.
-- **web-client-driving** — how the 1C web client behaves under a driver (snapshot reading, lists / trees / grids, reports, dialogs, anti-loop limits); load after the `ui-testing-tools.md` preflight, before the first action.
-
-## Workflow and integrations
-
-- **getconfigfiles** — extracting configuration objects (metadata) from an infobase into the repo.
-- **integrations-add** — code integrating 1C with another system (HTTP services, REST, message queues).
-- **sdd-integrations** — OpenSpec guidelines; load whenever reading or updating files under `openspec/`.
-- **support-feedback** — support channel (`/support`, `/supportstatus`, `/checkupdates`): `SUPPORT_KEY` / `SUPPORT_EMAIL` preconditions, the evidence threshold and mandatory operator approval for a model-initiated ticket, the `/evolve` boundary; load on a suspected defect in a shipped rule or MCP server, or on an update question.
-
-## Metadata
-
-- **metadata-xml-workarounds** — recurring metadata / form XML pitfalls; load when authoring or fixing metadata XML by hand outside the `1c-metadata-manage` skill.
-
-## Quality
-
-- **anti-patterns** — 1C anti-pattern catalog, performance guidelines, review scoring; load for code review, performance investigation, or anti-pattern check.
-- **verification-checklist** — compatibility router for verification policy, hard gates, and delivery checks; load only when following a legacy reference or when the required stage is not yet known.
-- **verification-policy** — `VERIFICATION_DEPTH`, quick-fix eligibility, promotion triggers, and the quick-fix gate; load during triage.
-- **verification-gates** — evidence reuse plus syntax, logic, style, impact, and metadata XML gates; load before validating BSL / metadata changes.
-- **verification-delivery** — reproduction, plan adherence, optional review / UI test, delivery report, and verification anti-patterns; load after applicable hard gates.
-- **designer-batch-checks** — Designer batch verification (`/CheckModules`, `/CheckCanApplyConfigurationExtensions`, `/CheckConfig`), the three-signal verdict, extension rollback, never-run switches; load before applying a configuration / extension to an infobase, or when the MCP validators are missing.
-- **systematic-debugging** — 4-phase debugging methodology for 1C, with a fast path for directly evidenced root causes (`DEBUG_FAST_PATH` in `.dev.env`); load for any bug / runtime error / regression, or when delegating to `1c-error-fixer` / `1c-performance-optimizer`.
-- **platform-solutions** — case book of platform pitfalls and proven fix templates; load when working on a matching topic.
+- settings, platform/ИБ, UI-test policy → `dev-standards-env`
+- typical-code changes, metadata naming → `dev-standards-change-markers`
+- new or restructured module / query / managed form → `module-structure` / `query-design` / `forms`
+- code, review, debug, refactor, performance, metadata work → `tooling-playbooks`
+- `USE_EDT=true` → `edt-workflow`
+- applying a configuration/extension, missing MCP validators → `designer-batch-checks`
+- UI tests → `ui-testing-tools` → `web-client-driving`
+- extract from ИБ → `getconfigfiles`; integrations → `integrations-add`
+- metadata hand-edit within a skill exception → `metadata-xml-workarounds`
 
 # Spec-driven development workspace
 
-OpenSpec workspace at `openspec/`: `specs/` — current behaviour, source of truth (`openspec/specs/README.md`); `changes/` — active proposals (`proposal.md` / `design.md` / `tasks.md` / delta `specs/`, `openspec/changes/README.md`); `project.md` — auto-generated 1C project context, created by the installer on `init` / `update` only when `Configuration.xml` is present (see `Project info`); `config.yaml` — OpenSpec configuration. Agent-side rules — `content/rules/sdd-integrations.md`, load whenever reading or updating files under `openspec/`. Slash commands: `/opsx:propose`, `/opsx:apply`, `/opsx:archive`, `/opsx:explore`.
+`openspec/specs/` is current behaviour, `openspec/changes/` holds change artifacts; before OpenSpec work load `content/rules/sdd-integrations.md` (owns full-cycle DoD and apply completion).

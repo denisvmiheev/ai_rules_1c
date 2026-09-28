@@ -1,12 +1,13 @@
 ---
-description: Install Cognee MCP as optional persistent agent memory and register it in the active AI client
+description: Install Cognee MCP as the preferred persistent memory write provider and register it in the active AI client
+userOnly: true
 ---
 
 # /install-cognee — install Cognee persistent memory
 
 Installs the official `cognee/cognee-mcp` server and exposes the focused memory API (`remember`, `recall`, `forget`) to the active AI client.
 
-Use Cognee for general cross-session or cross-client memory. It is optional: the purchased 1C MCP bundle already provides project-scoped vector memory through `1c-templates-mcp`. Keep the server id `cognee-memory` so the two memory providers remain distinguishable.
+Use Cognee for general cross-session or cross-client memory. Installation is optional and preserves `.dev.env` `TOOL_*` choices. Explicit installation permits setup checks even for `TOOL_COGNEE=off`; ordinary memory use remains disabled unless the user changes/overrides policy. Routing, triage scope and Cognee-first writes belong to `content/rules/project-memory.md`. Keep server id `cognee-memory` so namespaces remain distinguishable.
 
 Official sources:
 
@@ -139,4 +140,3 @@ Pin `SYSTEM_ROOT_DIRECTORY` and `DATA_ROOT_DIRECTORY` to stable absolute paths. 
 - Update: pull a newer image, record its digest, recreate only the container with the same `.env` and data bind mount, then verify health. Never delete the data directory as part of update.
 - Disable: stop the container and disable/remove only the `cognee-memory` MCP entry.
 - Delete memory: destructive and separate from uninstall. Require explicit confirmation naming the exact data directory before removing it.
-

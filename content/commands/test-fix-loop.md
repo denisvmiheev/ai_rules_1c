@@ -7,11 +7,11 @@ argumentHint: "[<scenario / task description>] [--iterations N]"
 
 Run the requested test scenarios against the test infobase and, when they fail, close the loop: diagnose → fix the code → redeploy → re-test — until every scenario passes or the iteration budget runs out. This is the *outer* loop over test failures; the *inner* retry loop for deploy errors stays where it lives (`/update1cbase → Update retry loop`) and does not consume test iterations.
 
-**Strictly opt-in.** This loop runs only when invoked as a command or explicitly requested in words. It is never an automatic stage of the subagent pipeline or the verification phase (`subagent-pipeline.md → When to deviate` — "UI testing is never an automatic stage of this pipeline"). Invoking it **is** the explicit UI-test request that `UI_TESTING=manual` requires; `UI_TESTING=off` still blocks — report that web testing is disabled in `.dev.env` and ask the user to switch before proceeding. UI iterations are token-expensive — state the expected cost once at the start.
+**Strictly opt-in.** This loop runs only when invoked as a command or explicitly requested in words; `UI_TESTING=auto` enables routine UI verification, not this repeated deploy/fix loop. Invoking it **is** the explicit UI-test request that `manual` requires. Effective `UI_TESTING=off` still blocks: point to `/uitests on` or `/uitests manual`; an explicit enable-and-run instruction satisfies the switch without a second confirmation. Execution prerequisites still apply. UI iterations are token-expensive — state the expected cost once at the start.
 
 ## Step 0. Prerequisites
 
-Canon — `dev-standards-env.md`. Blocking for this command: `PLATFORM_PATH`, `INFOBASE_PATH`, **and `INFOBASE_PUBLISH_URL`** (the loop tests through the web client; without the URL there is nothing to loop over — stop and ask). The dev/test-target confirmation of `/deploy-and-test` applies unchanged.
+Parameters, classes and defaults — `content/rules/dev-standards-env.md §1`; Defaulted keys are never asked for. Blocking for this command: `PLATFORM_PATH`, `INFOBASE_PATH`, **and `INFOBASE_PUBLISH_URL`** (the loop tests through the web client; without the URL there is nothing to loop over — stop and ask). The dev/test-target confirmation of `/deploy-and-test` applies unchanged.
 
 Scenario set: taken from the argument / user request. Do not invent scenarios beyond what was asked; one scenario per user-visible behavior, in the template of `content/agents/tester.md → Test Scenarios`.
 
@@ -26,7 +26,7 @@ Iteration budget: `--iterations N` or a number stated in the request; default **
    - Iteration 1: the full requested set.
    - Later iterations: only the previously failed scenarios, **plus** any previously passed scenario whose covered area was touched by the fix (use the impact-analysis evidence from Gate 4 of `verification-gates.md` to decide; when in doubt, re-run the scenario).
 3. **All green → exit** to the final report.
-4. **On failure — fix before the next iteration.** Diagnose per `systematic-debugging.md` (the `DEBUG_FAST_PATH` fast path applies). Fix through the normal development procedure — triage quick-fix vs full-cycle per `AGENTS.md`, delegating to `1c-error-fixer` when delegation is warranted (`subagents.md`). Run the applicable Gates 1–3 on every touched module **before** redeploying. Re-deploying unchanged sources is forbidden — the same no-change-repeat rule as everywhere else; an iteration without a fix is a wasted iteration and a defect.
+4. **On failure — fix before the next iteration.** Diagnose per `standards(name="systematic-debugging")` (the `DEBUG_FAST_PATH` fast path applies). Fix through the normal development procedure — triage quick-fix vs full-cycle per `AGENTS.md`, delegating to `1c-error-fixer` when delegation is warranted (`subagents.md`). Run the applicable Gates 1–3 on every touched module **before** redeploying. Re-deploying unchanged sources is forbidden — the same no-change-repeat rule as everywhere else; an iteration without a fix is a wasted iteration and a defect.
 5. Next iteration (back to 1) while the budget allows.
 
 ## Hard rules

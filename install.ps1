@@ -129,7 +129,7 @@ $script:DevEnvFileName = '.dev.env'
 $script:DevEnvExampleName = '.dev.env.example'
 $script:UseEdtKey = 'USE_EDT'
 $script:SupportKeys = @('SUPPORT_KEY', 'SUPPORT_EMAIL', 'SUPPORT_API_URL')
-$script:SupportedTools = @('cursor', 'claude-code', 'codex', 'opencode', 'kilocode', 'kimi', 'qwen', 'command-code', 'cline', 'pi', 'other')
+$script:SupportedTools = @('cursor', 'claude-code', 'codex', 'opencode', 'kilocode', 'kimi', 'qwen', 'command-code', 'cline', 'zcode', 'mimocode', 'pi', 'other')
 $script:ManagedBlocks = @('core', 'user-defined', 'openspec')
 $script:LastChannel = 'powershell'
 $script:Utf8NoBom = New-Object System.Text.UTF8Encoding $false
@@ -200,6 +200,64 @@ function Read-Choice {
 function Read-TextFile {
     param([string]$Path)
     return [System.IO.File]::ReadAllText((Resolve-Path $Path).Path)
+}
+
+function Resolve-InstallerExistingPath {
+    # Resolve-Path preserves Windows 8.3 aliases while enumeration can return
+    # long names. Resolve through a handle so restricted ancestor enumeration
+    # does not break valid paths; junctions also resolve before containment.
+    param([string]$Path)
+    $full = [IO.Path]::GetFullPath((Resolve-Path -LiteralPath $Path -ErrorAction Stop).ProviderPath)
+    if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        if (-not ('RulesInstaller.NativePaths' -as [type])) {
+            Add-Type -TypeDefinition @'
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+namespace RulesInstaller {
+    public static class NativePaths {
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern SafeFileHandle CreateFile(string path, uint access, uint share,
+            IntPtr security, uint creation, uint flags, IntPtr template);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern uint GetFinalPathNameByHandle(SafeFileHandle file,
+            StringBuilder result, uint capacity, uint flags);
+    }
+}
+'@
+        }
+        # No data access requested; share read/write/delete and allow directories.
+        $handle = [RulesInstaller.NativePaths]::CreateFile($full, 0, 7, [IntPtr]::Zero, 3, 0x02000000, [IntPtr]::Zero)
+        try {
+            if ($handle.IsInvalid) { throw "Cannot open existing installer path: $Path" }
+            $buffer = New-Object Text.StringBuilder 32768
+            $length = [RulesInstaller.NativePaths]::GetFinalPathNameByHandle($handle, $buffer, $buffer.Capacity, 0)
+            if ($length -eq 0 -or $length -ge $buffer.Capacity) {
+                throw "Cannot normalize existing installer path: $Path"
+            }
+            $full = $buffer.ToString()
+            if ($full.StartsWith('\\?\UNC\', [StringComparison]::OrdinalIgnoreCase)) {
+                $full = '\\' + $full.Substring(8)
+            }
+            elseif ($full.StartsWith('\\?\')) { $full = $full.Substring(4) }
+        }
+        finally { $handle.Dispose() }
+    }
+    return $full
+}
+
+function Get-InstallerRelativePath {
+    param([string]$BasePath, [string]$ChildPath)
+    $base = (Resolve-InstallerExistingPath $BasePath).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    $child = Resolve-InstallerExistingPath $ChildPath
+    $comparison = if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        [StringComparison]::OrdinalIgnoreCase
+    } else { [StringComparison]::Ordinal }
+    if (-not $child.StartsWith($base, $comparison)) {
+        throw "Installer path is outside its base: $ChildPath (base: $BasePath)"
+    }
+    return $child.Substring($base.Length).Replace('\', '/')
 }
 
 function Write-TextFile {
@@ -608,6 +666,8 @@ function Invoke-FrontmatterOps {
     $rename = if ($Ops.rename) { $Ops.rename } else { @{} }
     $addIf = if ($Ops.addIf) { $Ops.addIf } else { @{} }
     $toolsToPermission = if ($Ops.toolsToPermission) { $Ops.toolsToPermission } else { $null }
+    $toolsToDenylist = if ($Ops.toolsToDenylist) { $Ops.toolsToDenylist } else { $null }
+    $toolsToFlag = if ($Ops.toolsToFlag) { $Ops.toolsToFlag } else { $null }
 
     # Phase 0: tools array -> permission object (OpenCode).
     # Runs BEFORE keep/drop so it can still read the source `tools` list.
@@ -637,6 +697,65 @@ function Invoke-FrontmatterOps {
                 }
             }
             if ($permission.Keys.Count -gt 0) { $src['permission'] = $permission }
+        }
+    }
+
+    # Phase 0b: tools array -> host denylist (Claude Code, Kimi Code, Qwen Code).
+    # Also runs BEFORE keep/drop so it can still read the source `tools` list.
+    # Those hosts resolve `tools` as a strict allowlist of THEIR OWN tool names,
+    # so the abstract source vocabulary (`Shell`, `MCP`) matches nothing and the
+    # subagent silently loses shell and every MCP server. Omitting `tools` makes
+    # it inherit the parent pool (MCP included) and the capabilities the source
+    # list withholds are re-imposed through the host's denylist field, which is
+    # applied to that inherited pool.
+    if ($toolsToDenylist) {
+        $srcKey = if ($toolsToDenylist.source) { $toolsToDenylist.source } else { 'tools' }
+        $targetKey = if ($toolsToDenylist.target) { $toolsToDenylist.target } else { 'disallowedTools' }
+        $map = $toolsToDenylist.map
+        if ($map -and $src.Contains($srcKey)) {
+            $granted = @($src[$srcKey])
+            $grantedHostTools = @()
+            $candidates = @()
+            foreach ($srcTool in $map.Keys) {
+                $hostTools = @($map[$srcTool])
+                if ($granted -contains $srcTool) { $grantedHostTools += $hostTools }
+                else { $candidates += $hostTools }
+            }
+            $denied = @()
+            foreach ($hostTool in $candidates) {
+                if ([string]::IsNullOrWhiteSpace([string]$hostTool)) { continue }
+                # Several source tools can map to one host tool (Write/Edit ->
+                # NotebookEdit): any granting tool keeps it out of the denylist.
+                if ($grantedHostTools -contains $hostTool) { continue }
+                if ($denied -contains $hostTool) { continue }
+                $denied += $hostTool
+            }
+            # Comma-separated string: the form all three hosts document.
+            if ($denied.Count -gt 0) { $src[$targetKey] = ($denied -join ', ') }
+            elseif ($src.Contains($targetKey)) { $src.Remove($targetKey) }
+        }
+    }
+
+    # Phase 0c: tools array -> single capability flag (Cursor `readonly`).
+    # Also runs BEFORE keep/drop. Cursor has no per-tool field for custom
+    # agents; the one documented restriction is the boolean `readonly`, which
+    # covers exactly "no file edits, no state-changing shell commands". The
+    # flag is set only when the source list grants none of `whenNoneOf`, and
+    # omitted otherwise — an agent that may write must not carry `readonly:
+    # false`, which would read as a deliberate grant rather than a default.
+    if ($toolsToFlag) {
+        $srcKey = if ($toolsToFlag.source) { $toolsToFlag.source } else { 'tools' }
+        $targetKey = $toolsToFlag.target
+        $whenNoneOf = @($toolsToFlag.whenNoneOf)
+        $value = if ($null -ne $toolsToFlag.value) { $toolsToFlag.value } else { $true }
+        if ($targetKey -and $whenNoneOf.Count -gt 0 -and $src.Contains($srcKey)) {
+            $granted = @($src[$srcKey])
+            $anyGranted = $false
+            foreach ($srcTool in $whenNoneOf) {
+                if ($granted -contains $srcTool) { $anyGranted = $true; break }
+            }
+            if (-not $anyGranted) { $src[$targetKey] = $value }
+            elseif ($src.Contains($targetKey)) { $src.Remove($targetKey) }
         }
     }
 
@@ -819,6 +938,43 @@ function Resolve-McpServerPlaceholders {
     return , $unresolved
 }
 
+function Resolve-McpServerHeadersFromEnv {
+    # Secret headers are described in the public catalogue by environment
+    # variable name, never by value. Resolve them only in memory immediately
+    # before rendering local client configs. Missing variables leave the header
+    # absent (read-only tools still work) and are reported to the caller.
+    param([array]$Servers)
+
+    $unresolved = @()
+    foreach ($s in $Servers) {
+        if (-not $s.headersFromEnv) { continue }
+
+        $headers = [ordered]@{}
+        if ($s.headers) {
+            foreach ($p in $s.headers.PSObject.Properties) {
+                $headers[$p.Name] = [string]$p.Value
+            }
+        }
+
+        foreach ($p in $s.headersFromEnv.PSObject.Properties) {
+            $spec = $p.Value
+            $envName = [string]$spec.env
+            $raw = [Environment]::GetEnvironmentVariable($envName)
+            if ([string]::IsNullOrWhiteSpace($raw)) {
+                $unresolved += ($s.id + ':' + $envName)
+                continue
+            }
+            $prefix = if ($null -ne $spec.prefix) { [string]$spec.prefix } else { '' }
+            $headers[$p.Name] = $prefix + $raw
+        }
+
+        if ($headers.Count -gt 0) {
+            $s | Add-Member -NotePropertyName headers -NotePropertyValue $headers -Force
+        }
+    }
+    return , $unresolved
+}
+
 function Test-McpHttpEndpoint {
     # Probes an HTTP endpoint with a short timeout. Used to detect whether a
     # 1C HTTP-service-based MCP server (`1c-data-mcp`) is reachable AND
@@ -858,6 +1014,7 @@ function ConvertTo-McpServersJsonDict {
         $entry = [ordered]@{}
         if ($s.url) { $entry['url'] = $s.url }
         if ($s.connectionId) { $entry['connection_id'] = $s.connectionId }
+        if ($s.headers) { $entry['headers'] = $s.headers }
         if ($s.description) { $entry['description'] = $s.description }
         if ($s.command) { $entry['command'] = $s.command }
         if ($s.args) { $entry['args'] = $s.args }
@@ -901,6 +1058,29 @@ function New-McpConfig-ClaudeCode {
     return (ConvertTo-Json $root -Depth 10)
 }
 
+function New-McpConfig-Zcode {
+    # Native workspace config: .zcode/config.json -> mcp.servers.
+    # Its strict schema accepts type/http/url or type/stdio/command.
+    param([array]$Servers)
+    $dict = [ordered]@{}
+    foreach ($s in $Servers) {
+        $entry = [ordered]@{}
+        if ($s.url) {
+            $entry['type'] = 'http'
+            $entry['url'] = $s.url
+            if ($s.headers) { $entry['headers'] = $s.headers }
+        }
+        elseif ($s.command) {
+            $entry['type'] = 'stdio'
+            $entry['command'] = $s.command
+            if ($s.args) { $entry['args'] = $s.args }
+            if ($s.env) { $entry['env'] = $s.env }
+        }
+        $dict[$s.id] = $entry
+    }
+    return (ConvertTo-Json ([ordered]@{ mcp = [ordered]@{ servers = $dict } }) -Depth 10)
+}
+
 function New-McpConfig-Kilocode {
     # Current Kilo CLI / Kilo Code extension MCP schema (v7.x+, see
     # https://kilo.ai/docs/automate/mcp/using-in-cli):
@@ -933,6 +1113,7 @@ function New-McpConfig-Kilocode {
         if ($s.url) {
             $entry['type'] = 'remote'
             $entry['url'] = $s.url
+            if ($s.headers) { $entry['headers'] = $s.headers }
         }
         elseif ($s.command) {
             $entry['type'] = 'local'
@@ -1011,7 +1192,7 @@ function New-McpConfig-OpenCode {
     # allowed, and any unknown key (e.g. `description`, `connection_id`) makes
     # OpenCode reject the whole config so the servers silently never load.
     # Emit only:
-    #   remote -> { type: "remote", url, enabled }
+    #   remote -> { type: "remote", url, enabled, headers? }
     #   local  -> { type: "local",  command: [...], enabled, environment? }
     # `enabled: true` is written explicitly (matches OpenCode's documented
     # examples). `$schema` is added for editor validation; on merge an existing
@@ -1023,6 +1204,7 @@ function New-McpConfig-OpenCode {
         if ($s.url) {
             $entry['type'] = 'remote'
             $entry['url'] = $s.url
+            if ($s.headers) { $entry['headers'] = $s.headers }
         }
         elseif ($s.command) {
             $entry['type'] = 'local'
@@ -1047,6 +1229,13 @@ function New-McpConfig-Codex {
         if ($s.url) { $lines += 'url = ' + (Format-TomlString $s.url) }
         if ($s.connectionId) { $lines += 'connection_id = ' + (Format-TomlString $s.connectionId) }
         if ($s.description) { $lines += 'description = ' + (Format-TomlString $s.description) }
+        if ($s.headers) {
+            $parts = @()
+            foreach ($p in $s.headers.PSObject.Properties) {
+                $parts += ((Format-TomlString $p.Name) + ' = ' + (Format-TomlString ([string]$p.Value)))
+            }
+            $lines += 'http_headers = { ' + ($parts -join ', ') + ' }'
+        }
         if ($s.command) {
             $lines += 'command = ' + (Format-TomlString $s.command)
             if ($s.args) { $lines += 'args = ' + (Format-TomlArray $s.args) }
@@ -1065,6 +1254,8 @@ function New-McpConfig {
         'cursor' { return (New-McpConfig-Cursor $Servers) }
         'claude-code' { return (New-McpConfig-ClaudeCode $Servers) }
         'command-code' { return (New-McpConfig-ClaudeCode $Servers) }
+        'zcode' { return (New-McpConfig-Zcode $Servers) }
+        'mimocode' { return (New-McpConfig-Kilocode $Servers) }
         'codex' { return (New-McpConfig-Codex $Servers) }
         'opencode' { return (New-McpConfig-OpenCode $Servers) }
         'kilocode' { return (New-McpConfig-Kilocode $Servers) }
@@ -1091,6 +1282,7 @@ function New-Manifest {
         version       = $Version
         installedAt   = $ts
         updatedAt     = $ts
+        lastUpdatesCheckAt = $ts
         lastChannel   = $script:LastChannel
         tools         = @()
         language      = 'en'
@@ -1162,6 +1354,8 @@ function Get-ToolDetectionSignals {
         'qwen'         = @((Test-Path (Join-Path $Root '.qwen')), (Test-Path (Join-Path $Root 'QWEN.md')))
         'command-code' = @((Test-Path (Join-Path $Root '.commandcode')))
         'cline'        = @((Test-Path (Join-Path $Root '.cline')), (Test-Path (Join-Path $Root '.clinerules')))
+        'zcode'        = @((Test-Path (Join-Path $Root '.zcode')))
+        'mimocode'     = @((Test-Path (Join-Path $Root '.mimocode')), (Test-Path (Join-Path $Root 'mimocode.json')), (Test-Path (Join-Path $Root 'mimocode.jsonc')))
         'pi'           = @((Test-Path (Join-Path $Root '.pi')))
         # 'other' is a manual-only fallback — never auto-detected.
         'other'        = @()
@@ -1266,7 +1460,6 @@ function Invoke-ScanForeign {
     if ($Manifest -and $Manifest.files) {
         foreach ($k in $Manifest.files.Keys) { $managedFiles[$k] = $true }
     }
-    $rootFull = (Resolve-Path $Root).Path.TrimEnd('\', '/')
     foreach ($tool in $ActiveTools) {
         $adapter = $Adapters[$tool]
         if (-not $adapter) { continue }
@@ -1277,7 +1470,7 @@ function Invoke-ScanForeign {
             if (-not (Test-Path $abs)) { continue }
             $files = Get-ChildItem -Recurse -File -Path $abs -ErrorAction SilentlyContinue
             foreach ($f in $files) {
-                $rel = $f.FullName.Substring($rootFull.Length + 1).Replace('\', '/')
+                $rel = Get-InstallerRelativePath -BasePath $Root -ChildPath $f.FullName
                 if (-not $managedFiles.ContainsKey($rel)) { $foreign += $rel }
             }
         }
@@ -1289,7 +1482,6 @@ function Invoke-ScanForeign {
 function Invoke-ScanIntegrations {
     param([string]$Root)
     $result = [ordered]@{}
-    $rootFull = (Resolve-Path $Root).Path.TrimEnd('\', '/')
     $specsDir = Join-Path $Root 'openspec/specs'
     $changesDir = Join-Path $Root 'openspec/changes'
     if ((Test-Path $specsDir) -or (Test-Path $changesDir)) {
@@ -1297,7 +1489,7 @@ function Invoke-ScanIntegrations {
         foreach ($d in @($specsDir, $changesDir)) {
             if (Test-Path $d) {
                 Get-ChildItem -Recurse -File -Path $d -Filter *.md -ErrorAction SilentlyContinue | ForEach-Object {
-                    $files += $_.FullName.Substring($rootFull.Length + 1).Replace('\', '/')
+                    $files += Get-InstallerRelativePath -BasePath $Root -ChildPath $_.FullName
                 }
             }
         }
@@ -1329,11 +1521,10 @@ function Invoke-OpenSpecScaffold {
         return
     }
 
-    $sourceFull = (Resolve-Path $sourceOpenSpec).Path.TrimEnd('\', '/')
     $copied = 0
     $skipped = 0
     Get-ChildItem -Recurse -File -Path $sourceOpenSpec -ErrorAction SilentlyContinue | ForEach-Object {
-        $rel = $_.FullName.Substring($sourceFull.Length + 1).Replace('\', '/')
+        $rel = Get-InstallerRelativePath -BasePath $sourceOpenSpec -ChildPath $_.FullName
         $targetRel = "openspec/$rel"
         $targetAbs = Join-Path $Root $targetRel
         if (Test-Path $targetAbs) {
@@ -1366,13 +1557,24 @@ function Invoke-OpenSpecScaffold {
 # Code with two project folders (`.kilo` + `.kilocode`). Remap the Kilo Code
 # artefacts onto the same `.kilo/` root — commands into `.kilo/commands/`
 # (Kilo's current location for what upstream calls "workflows") and skills into
-# `.kilo/skills/`. All other tools already match their adapter, so their paths
-# pass through unchanged.
+# `.kilo/skills/`. Since OpenSpec 1.13 two more tools diverge from their
+# adapter: Codex skills come as the vendor-neutral `.agents/skills/` (the Codex
+# adapter installs skills into `.codex/skills/`), and OpenCode commands come as
+# `.opencode/commands/` (the OpenCode adapter uses `.opencode/command/`). Both
+# are remapped so every tool keeps a single skills / commands folder and the
+# install destinations of earlier bundles stay unchanged. All other paths pass
+# through unchanged.
 function Get-OpenSpecBundleDestRel {
     param(
         [string]$Tool,
         [string]$Rel
     )
+    if ($Tool -eq 'codex' -and $Rel -like '.agents/skills/*') {
+        return '.codex/skills/' + $Rel.Substring('.agents/skills/'.Length)
+    }
+    if ($Tool -eq 'opencode' -and $Rel -like '.opencode/commands/*') {
+        return '.opencode/command/' + $Rel.Substring('.opencode/commands/'.Length)
+    }
     if ($Tool -eq 'kilocode') {
         if ($Rel -like '.kilocode/workflows/*') {
             return '.kilo/commands/' + $Rel.Substring('.kilocode/workflows/'.Length)
@@ -1471,11 +1673,10 @@ function Invoke-OpenSpecArtifacts {
             $skippedTools += $tool
             continue
         }
-        $toolBundleFull = (Resolve-Path $toolBundle).Path.TrimEnd('\', '/')
         $toolCopied = 0
         $toolKept = 0
         Get-ChildItem -Recurse -File -Path $toolBundle -ErrorAction SilentlyContinue | ForEach-Object {
-            $rel = $_.FullName.Substring($toolBundleFull.Length + 1).Replace('\', '/')
+            $rel = Get-InstallerRelativePath -BasePath $toolBundle -ChildPath $_.FullName
             $destRel = Get-OpenSpecBundleDestRel -Tool $tool -Rel $rel
             if ($Manifest.files.Contains($destRel)) {
                 $existing = $Manifest.files[$destRel]
@@ -1582,6 +1783,13 @@ function Get-1cSynonymRu {
 function Get-1cProjectInfo {
     param([string]$Root)
 
+    # Root owns settings and generated documents; only the explicitly selected
+    # EXPORT_PATH owns the source metadata. Never guess among nested dumps.
+    $exportPath = Get-EnvFileValue -FilePath (Join-Path $Root $script:DevEnvFileName) -Key 'EXPORT_PATH'
+    $sourceRoot = if ([string]::IsNullOrWhiteSpace($exportPath)) { $Root }
+        elseif ([IO.Path]::IsPathRooted($exportPath)) { $exportPath }
+        else { Join-Path $Root $exportPath }
+
     $info = [ordered]@{
         Detected        = $false
         ConfigPath      = ''
@@ -1602,8 +1810,8 @@ function Get-1cProjectInfo {
         Counts          = [ordered]@{}
     }
 
-    $configXml = Join-Path $Root 'Configuration.xml'
-    $extXml = Join-Path $Root 'ConfigurationExtension.xml'
+    $configXml = Join-Path $sourceRoot 'Configuration.xml'
+    $extXml = Join-Path $sourceRoot 'ConfigurationExtension.xml'
     $xmlPath = $null
     if (Test-Path $configXml) { $xmlPath = $configXml }
     elseif (Test-Path $extXml) { $xmlPath = $extXml; $info.IsExtension = $true }
@@ -1660,12 +1868,12 @@ function Get-1cProjectInfo {
     )
     $bspFile = $null
     foreach ($c in $bspCandidates) {
-        $p = Join-Path $Root $c
+        $p = Join-Path $sourceRoot $c
         if (Test-Path $p) { $bspFile = $p; break }
     }
     if (-not $bspFile) {
         foreach ($n in @('СтандартныеПодсистемы.xml', 'StandardSubsystems.xml')) {
-            if (Test-Path (Join-Path $Root "Subsystems\$n")) { $info.BspDetected = $true; break }
+            if (Test-Path (Join-Path $sourceRoot "Subsystems\$n")) { $info.BspDetected = $true; break }
         }
     }
     if ($bspFile) {
@@ -1681,7 +1889,7 @@ function Get-1cProjectInfo {
         catch {}
     }
 
-    $subsDir = Join-Path $Root 'Subsystems'
+    $subsDir = Join-Path $sourceRoot 'Subsystems'
     if (Test-Path $subsDir) {
         $info.Subsystems = @(
             Get-ChildItem -File $subsDir -Filter *.xml -ErrorAction SilentlyContinue |
@@ -1706,7 +1914,7 @@ function Get-1cProjectInfo {
         'Tasks'                       = 'Задачи'
     }
     foreach ($k in $kinds.Keys) {
-        $d = Join-Path $Root $k
+        $d = Join-Path $sourceRoot $k
         if (Test-Path $d) {
             $count = @(Get-ChildItem -File $d -Filter *.xml -ErrorAction SilentlyContinue).Count
             if ($count -gt 0) { $info.Counts[$kinds[$k]] = $count }
@@ -1951,7 +2159,8 @@ function Invoke-PlaceArtifactFile {
         [string]$Template,
         [System.Collections.IDictionary]$Manifest,
         [string]$ContentSource,
-        [string]$OwnerTool
+        [string]$OwnerTool,
+        [System.Collections.IDictionary]$Layouts
     )
     # Respect user modifications: if manifest marks this path as userModified,
     # keep the user's edits and leave the manifest entry unchanged — unless the
@@ -1971,6 +2180,7 @@ function Invoke-PlaceArtifactFile {
         $absTarget = Join-Path $Root $TargetRel
     }
     if ($Mode -eq 'rebuild-toml') {
+        $SourceBody = Convert-AgentsMdPaths -Text $SourceBody -Layouts $Layouts
         $rendered = Invoke-CodexAgentTemplate -Template $Template -Fm $SourceFm -Body $SourceBody
         Write-TextFile -Path $absTarget -Content $rendered
     }
@@ -1979,7 +2189,11 @@ function Invoke-PlaceArtifactFile {
         if ($parentDir -and -not (Test-Path $parentDir)) {
             New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
         }
-        Copy-Item -Path $SourcePath -Destination $absTarget -Force
+        if ([IO.Path]::GetExtension($SourcePath) -ieq '.md') {
+            $rendered = Convert-AgentsMdPaths -Text (Read-TextFile $SourcePath) -Layouts $Layouts
+            Write-TextFile -Path $absTarget -Content $rendered
+        }
+        else { Copy-Item -LiteralPath $SourcePath -Destination $absTarget -Force }
     }
     else {
         $newFm = Invoke-FrontmatterOps -Source $SourceFm -Ops $FrontmatterOps
@@ -1990,6 +2204,7 @@ function Invoke-PlaceArtifactFile {
         else {
             $full = $SourceBody
         }
+        $full = Convert-AgentsMdPaths -Text $full -Layouts $Layouts
         Write-TextFile -Path $absTarget -Content $full
     }
     $hash = Get-FileSha256 $absTarget
@@ -2018,10 +2233,11 @@ function Invoke-PlaceSkill {
         [string]$TargetDir,
         [System.Collections.IDictionary]$Manifest,
         [string]$ContentSource,
-        [string]$OwnerTool
+        [string]$OwnerTool,
+        [System.Collections.IDictionary]$Layouts
     )
     $absTarget = Join-Path $Root $TargetDir
-    $srcFull = (Resolve-Path $SourceDir).Path.TrimEnd('\', '/')
+    $srcFull = Resolve-InstallerExistingPath $SourceDir
     $targetRelBase = ($TargetDir -replace '[\\/]+$', '').Replace('\', '/')
     if (-not (Test-Path $absTarget)) {
         New-Item -ItemType Directory -Force -Path $absTarget | Out-Null
@@ -2030,7 +2246,7 @@ function Invoke-PlaceSkill {
     # 1) Copy / refresh every source file unless the user owns it.
     $sourceRels = @{}
     foreach ($sf in Get-ChildItem -Recurse -File -Path $srcFull) {
-        $relWithin = $sf.FullName.Substring($srcFull.Length + 1).Replace('\', '/')
+        $relWithin = Get-InstallerRelativePath -BasePath $srcFull -ChildPath $sf.FullName
         $sourceRels[$relWithin] = $true
         $key = "$targetRelBase/$relWithin"
         if ($Manifest.files.Contains($key)) {
@@ -2045,7 +2261,11 @@ function Invoke-PlaceSkill {
         if ($destDir -and -not (Test-Path $destDir)) {
             New-Item -ItemType Directory -Force -Path $destDir | Out-Null
         }
-        Copy-Item -Path $sf.FullName -Destination $destFull -Force
+        if ($sf.Extension -ieq '.md') {
+            $rendered = Convert-AgentsMdPaths -Text (Read-TextFile $sf.FullName) -Layouts $Layouts
+            Write-TextFile -Path $destFull -Content $rendered
+        }
+        else { Copy-Item -LiteralPath $sf.FullName -Destination $destFull -Force }
         $previousEntry = if ($Manifest.files.Contains($key)) { $Manifest.files[$key] } else { $null }
         $entry = [ordered]@{
             source        = $ContentSource
@@ -2057,9 +2277,9 @@ function Invoke-PlaceSkill {
     }
 
     # 2) Prune files that are no longer shipped, keeping user-modified ones.
-    $absTargetFull = (Resolve-Path $absTarget).Path.TrimEnd('\', '/')
+    $absTargetFull = Resolve-InstallerExistingPath $absTarget
     foreach ($ef in Get-ChildItem -Recurse -File -Path $absTargetFull) {
-        $relWithin = $ef.FullName.Substring($absTargetFull.Length + 1).Replace('\', '/')
+        $relWithin = Get-InstallerRelativePath -BasePath $absTargetFull -ChildPath $ef.FullName
         if ($sourceRels.Contains($relWithin)) { continue }
         $key = "$targetRelBase/$relWithin"
         if ($Manifest.files.Contains($key)) {
@@ -2091,8 +2311,8 @@ function Invoke-PlaceSkill {
 #   SUBAGENT_MODEL_ANALYSIS — planning / analysis / review / testing / docs
 #                             (1c-planner, 1c-analytic, 1c-arch-reviewer,
 #                             1c-code-reviewer, 1c-doc-writer, 1c-tester);
-#   SUBAGENT_MODEL_LIGHT    — small bounded tasks: repo scouting / search /
-#                             quick fixes (1c-explorer, 1c-error-fixer).
+#   SUBAGENT_MODEL_LIGHT    — small bounded read-only tasks: repo scouting /
+#                             search / impact lists (1c-explorer).
 # All three are DEFAULTED parameters: an empty value means the model field is
 # omitted from the installed agent file and the AI client uses its default
 # model. The install never blocks on them.
@@ -2195,7 +2415,7 @@ function Resolve-ModelTiers {
 # normalised here (the LLM channel does the same by judgement, see
 # content/commands/rulesmodel.md). Matching is by family + major version:
 # case-insensitive, punctuation- and prefix-insensitive, Russian spellings
-# accepted. A name that is not one of the four supported models resolves to
+# accepted. A name that is not one of the supported models resolves to
 # an empty value — the base ruleset is model-neutral and complete without a
 # profile, so "no match" is a valid outcome, never an error.
 
@@ -2206,6 +2426,7 @@ $script:AgentModelProfiles = [ordered]@{
     sonnet5 = 'Claude Sonnet 5'
     fable5  = 'Claude Fable 5 / Mythos 5'
     gpt56   = 'GPT-5.6'
+    gpt6    = 'GPT-6 Astra'
 }
 
 function Resolve-AgentModelSlug {
@@ -2218,7 +2439,7 @@ function Resolve-AgentModelSlug {
     # Russian spellings first (before punctuation is stripped).
     $s = $s -replace 'клод', 'claude' -replace 'опус', 'opus' -replace 'соннет', 'sonnet' `
             -replace 'сонет', 'sonnet' -replace 'фейбл', 'fable' -replace 'фабл', 'fable' `
-            -replace 'мифос', 'mythos' -replace 'гпт', 'gpt' -replace 'опенаи', 'openai'
+            -replace 'мифос', 'mythos' -replace 'астра', 'astra' -replace 'гпт', 'gpt' -replace 'опенаи', 'openai'
     # Drop everything that is not a letter or a digit: spaces, dashes, dots,
     # underscores, slashes, '#'. This also collapses provider prefixes and
     # client-side variants into the same string ("anthropic/claude-opus-5#xhigh"
@@ -2235,6 +2456,7 @@ function Resolve-AgentModelSlug {
     if ($s -match 'opus5') { return 'opus5' }
     if ($s -match 'sonnet5') { return 'sonnet5' }
     if ($s -match 'gpt56') { return 'gpt56' }
+    if ($s -match 'gpt6' -or $s -match 'astra') { return 'gpt6' }
     return ''
 }
 
@@ -2247,15 +2469,17 @@ function Read-AgentModelChoice {
     Write-Info '    [2] Claude Sonnet 5             (sonnet5)'
     Write-Info '    [3] Claude Fable 5 / Mythos 5   (fable5)'
     Write-Info '    [4] GPT-5.6                     (gpt56)'
-    Write-Info '    [5] другая модель / не задавать (базовый свод правил, профиль не применяется)'
-    Write-Info '    [6] ввести название модели самому (в любом написании)'
-    $choice = Read-Required '  Выбор модели головного агента' '5'
+    Write-Info '    [5] GPT-6 Astra                 (gpt6)'
+    Write-Info '    [6] другая модель / не задавать (базовый свод правил, профиль не применяется)'
+    Write-Info '    [7] ввести название модели самому (в любом написании)'
+    $choice = Read-Required '  Выбор модели головного агента' '6'
     switch ($choice) {
         '1' { return 'opus5' }
         '2' { return 'sonnet5' }
         '3' { return 'fable5' }
         '4' { return 'gpt56' }
-        '6' {
+        '5' { return 'gpt6' }
+        '7' {
             $raw = Read-Required '  Название модели (Enter — без профиля)' ''
             $slug = Resolve-AgentModelSlug -Raw $raw
             if (-not $slug -and $raw) {
@@ -2322,6 +2546,17 @@ function Invoke-PlacePhase {
         [hashtable]$Adapters,
         [System.Collections.IDictionary]$Manifest
     )
+    # `add` places only the new client, but its links still use the canonical
+    # layout of the complete active tool set, including previously installed tools.
+    $canonicalTools = @(@($ActiveTools) + @($Manifest.tools) | Select-Object -Unique)
+    $canonicalAdapters = @{}
+    foreach ($key in $Adapters.Keys) { $canonicalAdapters[$key] = $Adapters[$key] }
+    $missingAdapters = @($canonicalTools | Where-Object { -not $canonicalAdapters.ContainsKey($_) })
+    if ($missingAdapters.Count -gt 0) {
+        $loadedAdapters = Load-Adapters -SourceRoot $SourceRoot -Tools $missingAdapters
+        foreach ($key in $loadedAdapters.Keys) { $canonicalAdapters[$key] = $loadedAdapters[$key] }
+    }
+    $layouts = Resolve-CanonicalArtifactLayouts -ActiveTools $canonicalTools -Adapters $canonicalAdapters
     foreach ($tool in $ActiveTools) {
         $adapter = $Adapters[$tool]
         Write-Info "  [$tool] placing files"
@@ -2338,7 +2573,7 @@ function Invoke-PlacePhase {
                 Invoke-PlaceArtifactFile -Root $Root -SourcePath $f.FullName `
                     -TargetRel $target -SourceFm $parts.Frontmatter -SourceBody $parts.Body `
                     -FrontmatterOps $fmOps -Mode $mode `
-                    -Manifest $Manifest -ContentSource ("content/rules/" + $f.Name) -OwnerTool $tool
+                    -Manifest $Manifest -ContentSource ("content/rules/" + $f.Name) -OwnerTool $tool -Layouts $layouts
             }
         }
 
@@ -2356,7 +2591,7 @@ function Invoke-PlacePhase {
                 Invoke-PlaceArtifactFile -Root $Root -SourcePath $f.FullName `
                     -TargetRel $target -SourceFm $agentFm -SourceBody $parts.Body `
                     -FrontmatterOps $fmOps -Mode $mode -Template $template `
-                    -Manifest $Manifest -ContentSource ("content/agents/" + $f.Name) -OwnerTool $tool
+                    -Manifest $Manifest -ContentSource ("content/agents/" + $f.Name) -OwnerTool $tool -Layouts $layouts
             }
         }
 
@@ -2374,14 +2609,14 @@ function Invoke-PlacePhase {
                     Invoke-PlaceArtifactFile -Root $Root -SourcePath $f.FullName `
                         -TargetRel $targetRaw -SourceFm $parts.Frontmatter -SourceBody $parts.Body `
                         -FrontmatterOps $fmOps -Mode $mode `
-                        -Manifest $Manifest -ContentSource ("content/commands/" + $f.Name) -OwnerTool $tool
+                        -Manifest $Manifest -ContentSource ("content/commands/" + $f.Name) -OwnerTool $tool -Layouts $layouts
                     Write-Warn "  command written to user scope: $targetRaw (shared across projects)"
                 }
                 else {
                     Invoke-PlaceArtifactFile -Root $Root -SourcePath $f.FullName `
                         -TargetRel $targetRaw -SourceFm $parts.Frontmatter -SourceBody $parts.Body `
                         -FrontmatterOps $fmOps -Mode $mode `
-                        -Manifest $Manifest -ContentSource ("content/commands/" + $f.Name) -OwnerTool $tool
+                        -Manifest $Manifest -ContentSource ("content/commands/" + $f.Name) -OwnerTool $tool -Layouts $layouts
                 }
             }
         }
@@ -2395,7 +2630,7 @@ function Invoke-PlacePhase {
                 $name = $sd.Name
                 $targetDir = Resolve-CopyToPath $dirTpl $name
                 Invoke-PlaceSkill -Root $Root -SourceDir $sd.FullName -TargetDir $targetDir `
-                    -Manifest $Manifest -ContentSource ("content/skills/" + $name) -OwnerTool $tool
+                    -Manifest $Manifest -ContentSource ("content/skills/" + $name) -OwnerTool $tool -Layouts $layouts
             }
         }
 
@@ -2459,7 +2694,7 @@ function Invoke-PlacePhase {
 # `other` is intentionally last: when combined with any "real" tool the real
 # tool's rules dir wins; `.ai-agent/rules/` becomes canonical only when
 # `other` is the only active tool.
-$script:RulesDirPriority = @('cursor', 'claude-code', 'kilocode', 'kimi', 'qwen', 'command-code', 'cline', 'opencode', 'codex', 'pi', 'other')
+$script:RulesDirPriority = @('cursor', 'claude-code', 'kilocode', 'kimi', 'qwen', 'command-code', 'cline', 'zcode', 'mimocode', 'opencode', 'codex', 'pi', 'other')
 
 function Resolve-CanonicalRulesLayout {
     # Returns @{ Dir = <path>; Ext = <ext-without-dot> } for the highest-priority
@@ -2482,9 +2717,8 @@ function Resolve-CanonicalRulesLayout {
 # hashtable `{ rules = @{Dir=..; Ext=..}; agents = ...; commands = ...; skills = ... }`.
 # Sections without a defined canonical layout are simply omitted.
 #
-# Used by Update-AgentsMd to rewrite `content/<section>/...` paths in the
-# source AGENTS.md to the per-section installed paths so the agent reading
-# AGENTS.md from the project root can resolve every link to an existing file.
+# Used by the place phase and Update-AgentsMd so every installed Markdown
+# document and agent body can resolve source references from the project root.
 function Resolve-CanonicalArtifactLayouts {
     param(
         [string[]]$ActiveTools,
@@ -2503,7 +2737,7 @@ function Resolve-CanonicalArtifactLayouts {
             if (-not $dir) { continue }
             $ext = ''
             if ($copyTo -match '\{name\}\.([A-Za-z0-9]+)$') { $ext = $Matches[1] }
-            $layouts[$section] = [ordered]@{ Dir = $dir; Ext = $ext; Tool = $tool }
+            $layouts[$section] = [ordered]@{ Dir = $dir; Ext = $ext; Tool = $tool; Template = $copyTo.Replace('\', '/') }
             break
         }
     }
@@ -2512,9 +2746,8 @@ function Resolve-CanonicalArtifactLayouts {
 
 # Rewrite source-repo paths (`content/<section>/<name>.md`,
 # `content/skills/<rest>`) to the per-section canonical installed paths. The
-# source AGENTS.md is maintained with readable repo-relative paths; the
-# installer substitutes them so that the file copied into the project root
-# points at files that actually exist on disk for the active tool(s).
+# source is maintained with readable repo-relative paths; the installer
+# substitutes them in installed Markdown and generated agent bodies.
 #
 # Substitutions performed (when the corresponding section layout is known):
 #   content/rules/<name>.md     -> <rulesDir>/<name>.<rulesExt>
@@ -2549,12 +2782,14 @@ function Convert-AgentsMdPaths {
         # Closure capture for callback
         $captureDir = $dir
         $captureExt = $ext
+        $captureTemplate = [string]$Layouts[$section].Template
         # Pass 1: file references — both directory and extension are rewritten
         # (the extension swap matters for Cursor's `.mdc` rules and Codex's
         # `.toml` agents).
         $result = [regex]::Replace($result, $entry.Pattern, {
             param($m)
             $name = $m.Groups[1].Value
+            if ($captureTemplate) { return $captureTemplate.Replace('{name}', $name) }
             return "$captureDir/$name.$captureExt"
         })
         # Pass 2: bare directory references like `content/rules/` (used in the
@@ -2566,7 +2801,7 @@ function Convert-AgentsMdPaths {
     if ($Layouts.Contains('skills')) {
         $skillsDir = [string]$Layouts['skills'].Dir
         if ($skillsDir) {
-            # Skills are copied verbatim — anything after `content/skills/`
+            # Skills keep their directory layout — anything after `content/skills/`
             # (SKILL.md, docs/<file>.md, tools/<…>) is preserved by the
             # place phase, so a single prefix swap covers both file
             # references (`content/skills/<name>/SKILL.md`) and bare
@@ -2581,6 +2816,28 @@ function Convert-AgentsMdPaths {
 # ============================================================================
 # SECTION 11: MCP PHASE
 # ============================================================================
+
+function Get-McpConfigMap {
+    # Resolve a dictionary path, including ZCode's nested mcp.servers.
+    # Reject malformed config instead of replacing user data with an object.
+    param(
+        [System.Collections.IDictionary]$Config,
+        [string]$Key,
+        [switch]$Create
+    )
+    $node = $Config
+    foreach ($part in ($Key -split '\.')) {
+        if (-not $node.Contains($part)) {
+            if (-not $Create) { return $null }
+            $node[$part] = [ordered]@{}
+        }
+        if ($node[$part] -isnot [System.Collections.IDictionary]) {
+            throw "MCP config path '$Key' must contain JSON objects."
+        }
+        $node = $node[$part]
+    }
+    return $node
+}
 
 function Invoke-McpPhase {
     param(
@@ -2602,6 +2859,12 @@ function Invoke-McpPhase {
     if ($unresolved.Count -gt 0) {
         Write-Warn ("  MCP config: следующие серверы используют плейсхолдер {INFOBASE_PUBLISH_URL}, но INFOBASE_PUBLISH_URL в .dev.env пуст: " + ($unresolved -join ', ') + '.')
         Write-Warn '  Заполните INFOBASE_PUBLISH_URL в .dev.env (URL веб-публикации ИБ, напр. http://localhost/<infobase_name>/ru/) и запустите установщик повторно — MCP-конфиг будет перерендерен с подставленным URL.'
+    }
+
+    $unresolvedHeaders = Resolve-McpServerHeadersFromEnv -Servers $servers
+    if ($unresolvedHeaders.Count -gt 0) {
+        Write-Warn ("  MCP config: не заданы переменные для защищённых заголовков: " + ($unresolvedHeaders -join ', ') + '.')
+        Write-Warn '  Читающие инструменты останутся доступны, но защищённые мутации Templates (`remember`, `add_template`, `plugin_reload`) потребуют повторного рендера с MCP_OPERATOR_TOKEN в окружении процесса установщика.'
     }
 
     # Probe HTTP-service-based MCP servers (1c-data-mcp). The MCP HTTP client
@@ -2725,7 +2988,39 @@ function Invoke-McpPhase {
         }
 
         $finalContent = $content
-        if ($mergeRequested -and (Test-Path $absTarget)) {
+        $mergeServers = $adapter.mcp -is [System.Collections.IDictionary] -and $adapter.mcp['mergeServers']
+        $managedServers = @()
+        if ($mergeRequested -and $mergeServers) {
+            # New adapters merge individual servers. A pre-existing server
+            # with the same id belongs to the user unless our manifest owns
+            # it; keep it on init/add. Invalid JSON must never be overwritten.
+            $merged = [ordered]@{}
+            if (Test-Path -LiteralPath $absTarget) {
+                $merged = ConvertTo-OrderedHashtable (Get-Content -LiteralPath $absTarget -Raw | ConvertFrom-Json -ErrorAction Stop)
+            }
+            $currentServers = Get-McpConfigMap -Config $merged -Key $mergeKey -Create
+            $renderedObj = ConvertTo-OrderedHashtable ($content | ConvertFrom-Json)
+            $newServers = Get-McpConfigMap -Config $renderedObj -Key $mergeKey
+            $previousServers = @()
+            if ($Manifest.files.Contains($target) -and $Manifest.files[$target].Contains('managedServers')) {
+                $previousServers = @($Manifest.files[$target]['managedServers'])
+            }
+            foreach ($id in $previousServers) {
+                if (-not $newServers.Contains($id) -and $currentServers.Contains($id)) {
+                    [void]$currentServers.Remove($id)
+                }
+            }
+            foreach ($id in $newServers.Keys) {
+                if ($currentServers.Contains($id) -and $id -notin $previousServers) {
+                    Write-Info "  [$tool] MCP server kept (user-owned): $id"
+                    continue
+                }
+                $currentServers[$id] = $newServers[$id]
+                $managedServers += $id
+            }
+            $finalContent = ConvertTo-Json $merged -Depth 20
+        }
+        elseif ($mergeRequested -and (Test-Path $absTarget)) {
             try {
                 $existingRaw = Get-Content -Path $absTarget -Raw -ErrorAction Stop
                 $existingObj = $existingRaw | ConvertFrom-Json -ErrorAction Stop
@@ -2767,6 +3062,7 @@ function Invoke-McpPhase {
         if ($mergeRequested) {
             $mcpEntry['merged'] = $true
             $mcpEntry['mergeKey'] = $mergeKey
+            if ($mergeServers) { $mcpEntry['managedServers'] = @($managedServers) }
         }
         # Track joint ownership when several tools share one MCP target
         # (currently Claude Code + Command Code both write `.mcp.json`).
@@ -3672,7 +3968,7 @@ function Place-RootTemplates {
 #
 # Behaviour:
 #   - If the file already exists in the project root — preserve every user
-#     value. A narrowly scoped migration may append the missing USE_EDT key.
+#     value. Migrations may append missing USE_EDT and TOOL_* keys.
 #   - If missing — render from the source `.dev.env.example` template,
 #     auto-fill what we can detect (PLATFORM_VERSION from Configuration.xml,
 #     PLATFORM_PATH from C:\Program Files\1cv8\, PREFIX from extension's
@@ -3697,9 +3993,11 @@ function Place-RootTemplates {
 #   QUICKFIX_MAX_LINES (empty = 40; quick-fix line budget),
 #   DEBUG_FAST_PATH (empty = standard; debugging fast-path mode),
 #   VERIFICATION_DEPTH (empty = standard; code-verification depth, toggled by
-#   the /litemode command),
-#   CAVEMAN (empty = on; caveman communication-style auto-activation, toggled
+#   the /sdlc command; /litemode is a compatibility alias),
+#   CAVEMAN (empty = auto; caveman communication-style auto-activation, toggled
 #   by the /caveman command),
+#   METADATA_PREVIEW (empty = auto; when the wrapper -Preview runs before a
+#   metadata write, toggled by the /previewmode command),
 #   PLATFORM_ARGS / IBCMD_ARGS (empty = no extra platform arguments; passed to
 #   1cv8.exe / ibcmd by the 1c-metadata-manage db-* / epf-* tools),
 #   SUPPORT_GUARD (empty = deny; reaction of the vendor-support guard in the
@@ -3763,6 +4061,160 @@ function Read-DevEnvKeys {
     return $result
 }
 
+function Test-InitialDumpSources {
+    # Ignore installed rules and dependencies, but include partial dumps and EDT.
+    param([string]$Root)
+
+    $skipDirs = @('.git', '.cursor', '.claude', '.kilo', '.kilocode', '.codex', '.agents',
+        '.opencode', '.kimi-code', '.qwen', '.commandcode', '.cline', '.zcode',
+        '.mimocode', '.pi', '.ai-agent', 'node_modules', '.venv')
+    $pending = New-Object 'System.Collections.Generic.Queue[string]'
+    $pending.Enqueue($Root)
+    while ($pending.Count -gt 0) {
+        foreach ($item in (Get-ChildItem -LiteralPath $pending.Dequeue() -Force -ErrorAction Stop)) {
+            if ($item.PSIsContainer) {
+                if ($skipDirs -contains $item.Name) { continue }
+                # Unknown linked source trees are not an empty project.
+                if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { return $true }
+                $pending.Enqueue($item.FullName)
+            }
+            elseif ($item.Name -in @('Configuration.xml', 'ConfigurationExtension.xml', 'ConfigDumpInfo.xml') -or
+                $item.Extension -in @('.bsl', '.mdo')) { return $true }
+        }
+    }
+    return $false
+}
+
+function Invoke-InitialSourceDump {
+    # Optional first-install step. Installation is already complete; a declined
+    # or failed export must not undo it. Never infer consent from installer flags.
+    param([string]$Root, [string]$SourceRoot, [System.Collections.IDictionary]$Manifest)
+
+    $envPath = Join-Path $Root $script:DevEnvFileName
+    $settings = Read-DevEnvKeys -Path $envPath
+    foreach ($key in @($settings.Keys)) {
+        $value = ([string]$settings[$key]).Trim()
+        if ($value.Length -ge 2 -and (($value.StartsWith('"') -and $value.EndsWith('"')) -or
+            ($value.StartsWith("'") -and $value.EndsWith("'")))) { $value = $value.Substring(1, $value.Length - 2) }
+        $settings[$key] = $value
+    }
+    if ([string]::IsNullOrWhiteSpace($settings['INFOBASE_PATH'])) { return }
+    try {
+        if (Test-InitialDumpSources -Root $Root) { return }
+        foreach ($key in @('EXPORT_PATH', 'EXTENSIONS_PATH')) {
+            if (-not $settings[$key]) { continue }
+            $sourcePath = if ([IO.Path]::IsPathRooted($settings[$key])) { $settings[$key] } else { Join-Path $Root $settings[$key] }
+            if ((Test-Path -LiteralPath $sourcePath -PathType Container) -and (Test-InitialDumpSources -Root $sourcePath)) { return }
+        }
+        Write-Info 'В проекте нет исходников 1С, но в .dev.env указана информационная база.'
+        if ($NonInteractive -or $AssumeYes) {
+            Write-Info 'Выгрузка необязательна и пропущена без диалога. Для выгрузки позже запустите /loadfrom1cbase full.'
+            return
+        }
+        $extension = ([string]$settings['EXTENSION_NAME']).Trim()
+        $relativeDestination = ([string]$settings['EXPORT_PATH']).Trim()
+        $newPaths = [ordered]@{}
+        if ($extension) {
+            if ($extension -in @('.', '..') -or $extension -match '[\\/:*?"<>|]') {
+                throw 'EXTENSION_NAME не подходит для имени каталога; выберите цель через /loadfrom1cbase full.'
+            }
+            $extensionsRoot = ([string]$settings['EXTENSIONS_PATH']).Trim()
+            if (-not $extensionsRoot) { $extensionsRoot = 'src/cfe'; $newPaths['EXTENSIONS_PATH'] = $extensionsRoot }
+            $relativeDestination = Join-Path $extensionsRoot $extension
+        }
+        elseif (-not $relativeDestination) {
+            $relativeDestination = 'src/cf'
+            $newPaths['EXPORT_PATH'] = $relativeDestination
+        }
+        $destination = if ([IO.Path]::IsPathRooted($relativeDestination)) {
+            [IO.Path]::GetFullPath($relativeDestination)
+        } else { [IO.Path]::GetFullPath((Join-Path $Root $relativeDestination)) }
+        $targetLabel = if ($extension) { "расширение $extension" } else { 'основная конфигурация' }
+        Write-Info "Цель: $targetLabel. Каталог XML-выгрузки: $destination"
+        if (-not (Read-YesNo 'Выгрузить исходники из указанной ИБ сейчас? Отказ не отменяет установку правил.' $false)) {
+            Write-Info 'Выгрузка пропущена. Позже можно запустить /loadfrom1cbase full.'
+            return
+        }
+        # Complex target selection and EDT conversion belong to the agent command.
+        if ($settings['USE_EDT'] -eq 'true') {
+            Write-Info 'Для EDT выполните /loadfrom1cbase full через агента: он выберет отдельный каталог XML-выгрузки.'
+            return
+        }
+        if (Test-Path -LiteralPath $destination) {
+            if (-not (Test-Path -LiteralPath $destination -PathType Container) -or
+                (Get-ChildItem -LiteralPath $destination -Force -ErrorAction Stop | Select-Object -First 1)) {
+                throw 'Каталог выгрузки уже содержит файлы. Для выбора безопасного назначения выполните /loadfrom1cbase full.'
+            }
+        }
+        $kind = ([string]$settings['INFOBASE_KIND']).Trim()
+        if (-not $kind) { $kind = 'file' }
+        $dumpArgs = @{ ConfigDir = $destination; Mode = 'Full' }
+        if ($kind -eq 'server') {
+            $connection = ([string]$settings['INFOBASE_PATH']).Trim() -split '[/\\]', 2
+            if ($connection.Count -ne 2 -or -not $connection[0] -or -not $connection[1]) {
+                throw 'Для серверной ИБ INFOBASE_PATH должен иметь вид server/base.'
+            }
+            $dumpArgs.InfoBaseServer = $connection[0]
+            $dumpArgs.InfoBaseRef = $connection[1]
+        }
+        elseif ($kind -eq 'file') {
+            $dumpArgs.InfoBasePath = $settings['INFOBASE_PATH']
+        }
+        else { throw 'INFOBASE_KIND должен быть file или server.' }
+        if ($settings['PLATFORM_PATH']) { $dumpArgs.V8Path = $settings['PLATFORM_PATH'] }
+        if ($settings['IB_USER']) { $dumpArgs.UserName = $settings['IB_USER'] }
+        if ($settings['IB_PASSWORD']) { $dumpArgs.Password = $settings['IB_PASSWORD'] }
+        if ($extension) { $dumpArgs.Extension = $extension }
+        $dumpScript = Join-Path $SourceRoot 'content/skills/1c-metadata-manage/tools/1c-db-ops/scripts/db-dump-xml.ps1'
+        if (-not (Test-Path -LiteralPath $dumpScript -PathType Leaf)) { throw 'Скрипт db-dump-xml.ps1 не найден в комплекте правил.' }
+        if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+            throw 'В этой ОС выгрузку выполняет агент через /loadfrom1cbase full.'
+        }
+
+        # Persist only newly chosen source roots; preserve all other user settings.
+        if ($newPaths.Count -gt 0) {
+            $envText = Read-TextFile $envPath
+            $newline = if ($envText.Contains("`r`n")) { "`r`n" } else { "`n" }
+            foreach ($key in $newPaths.Keys) {
+                $pattern = '(?m)^' + $key + '\s*=[^\r\n]*'
+                $entry = $key + '=' + $newPaths[$key]
+                if ([regex]::IsMatch($envText, $pattern)) {
+                    $envText = [regex]::Replace($envText, $pattern, [System.Text.RegularExpressions.MatchEvaluator]{ param($match) $entry })
+                }
+                else {
+                    if ($envText -and -not $envText.EndsWith("`n")) { $envText += $newline }
+                    $envText += $entry + $newline
+                }
+            }
+            Write-TextFile -Path $envPath -Content $envText
+            if ($Manifest -and $Manifest.files.Contains($script:DevEnvFileName)) {
+                $Manifest.files[$script:DevEnvFileName].installedHash = Get-FileSha256 $envPath
+                Write-Manifest -Root $Root -Manifest $Manifest
+            }
+        }
+        Write-Info "Выгрузка исходников в $destination"
+        Push-Location -LiteralPath $Root
+        try {
+            # Call operator contains the child script's exit; no command-string
+            # interpolation and no credentials in installer output.
+            $global:LASTEXITCODE = 0
+            & $dumpScript @dumpArgs
+            $dumpExitCode = $LASTEXITCODE
+        }
+        finally { Pop-Location }
+        if ($dumpExitCode -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $destination 'Configuration.xml') -PathType Leaf)) {
+            throw 'Выгрузка не подтверждена. Проверьте сообщения скрипта и повторите /loadfrom1cbase full через агента.'
+        }
+        Write-Info 'Исходники выгружены. Правила установлены; файлы выгрузки принадлежат проекту.'
+        return $true
+    }
+    catch {
+        Write-Warn $_.Exception.Message
+        Write-Info 'Правила установлены. Необязательная выгрузка не завершена; продолжите через /loadfrom1cbase full.'
+    }
+    finally { $global:LASTEXITCODE = 0 }
+}
+
 function Set-DevEnvValue {
     # In-place rewrite of a single KEY= line in the rendered template text.
     # Idempotent: only the first occurrence of `<Key>=...` at line start is
@@ -3814,6 +4266,7 @@ function Place-DevEnv {
                 installedHash = (Get-FileSha256 $target)
             }
         }
+        Ensure-ToolPolicySettings -Root $Root -SourceRoot $SourceRoot -Manifest $Manifest
         Write-Info "  .dev.env: already exists, leaving user values untouched"
         return
     }
@@ -3901,6 +4354,37 @@ function Place-DevEnv {
         Write-Info ("  .dev.env: operation-scoped fields left empty: " + ($operationScopedEmpty -join ', '))
         Write-Info '  This is valid; the relevant command will ask or apply its documented fallback when invoked.'
     }
+}
+
+function Ensure-ToolPolicySettings {
+    # Append only missing policy keys from the canonical template. Never infer
+    # availability from installation, rewrite choices, or prompt during update.
+    param(
+        [string]$Root,
+        [string]$SourceRoot,
+        [System.Collections.IDictionary]$Manifest
+    )
+
+    $target = Join-Path $Root $script:DevEnvFileName
+    $source = Join-Path $SourceRoot $script:DevEnvExampleName
+    if (-not (Test-Path -LiteralPath $target -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $source -PathType Leaf)) { return }
+
+    $values = Read-DevEnvKeys -Path $target
+    $template = Read-DevEnvKeys -Path $source
+    $missing = @($template.Keys | Where-Object { $_ -match '^TOOL_[A-Z_]+$' -and -not $values.Contains($_) })
+    if ($missing.Count -eq 0) { return }
+
+    $text = Read-TextFile $target
+    $newline = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }
+    if ($text.Length -gt 0 -and -not $text.EndsWith("`n")) { $text += $newline }
+    $text += $newline + '# Tool policy: auto (default), off, required; availability is checked separately.' + $newline
+    foreach ($key in $missing) { $text += $key + '=auto' + $newline }
+    Write-TextFile -Path $target -Content $text
+    if ($Manifest.files.Contains($script:DevEnvFileName)) {
+        $Manifest.files[$script:DevEnvFileName]['installedHash'] = Get-FileSha256 $target
+    }
+    Write-Info ('  .dev.env: added tool policy keys with auto defaults (' + ($missing -join ', ') + ')')
 }
 
 function Ensure-EdtUsageSetting {
@@ -4270,9 +4754,6 @@ function Invoke-Init {
     Write-Section 'Phase 6c: OpenSpec artefacts (slash commands + skills)'
     Invoke-OpenSpecArtifacts -Root $Root -SourceRoot $sourceRoot -ActiveTools $activeTools -Manifest $manifest
 
-    Write-Section 'Phase 6d: OpenSpec project.md (1C autodetect)'
-    Invoke-OpenSpecProjectMd -Root $Root -Manifest $manifest
-
     # .dev.env must be placed BEFORE the MCP phase because some MCP server
     # URLs in `content/mcp-servers.json` reference {INFOBASE_PUBLISH_URL} —
     # the installer substitutes that placeholder from the freshly-written
@@ -4282,6 +4763,9 @@ function Invoke-Init {
     Invoke-LegacyInfobaseSettingsMigration -Root $Root -Manifest $manifest
     Ensure-EdtUsageSetting -Root $Root -Manifest $manifest
     Ensure-SupportSettings -Root $Root -Manifest $manifest
+
+    Write-Section 'Phase 7b: OpenSpec project.md (1C autodetect)'
+    Invoke-OpenSpecProjectMd -Root $Root -Manifest $manifest
 
     Write-Section 'Phase 8: MCP'
     $extMcp = Resolve-ExternalMcpMode -ProjectRoot $Root
@@ -4319,6 +4803,9 @@ function Invoke-Init {
     Write-Section 'Phase 10b: OpenCode agent frontmatter gate'
     Assert-OpenCodeAgentFrontmatter -Root $Root
 
+    Write-Section 'Phase 10c: Agent tool vocabulary gate'
+    Assert-AgentToolVocabulary -Root $Root
+
     Write-Section 'Phase 11: Report'
     Write-Info "Installation complete."
     Write-Info "  Version: $version (via $($script:LastChannel) channel)"
@@ -4337,7 +4824,18 @@ function Invoke-Init {
     Write-RulesModelAnnouncement -Root $Root
 
     Write-RestartRecommendation -ActiveTools $activeTools -McpCount $manifest.mcpServers.Count
+    Write-McpEffectivenessReminder -Root $Root -ExternalMcp $extMcp
     Write-InstallToolsAnnouncement
+
+    if (-not $existing -and $verify.Ok) {
+        $sourceDumped = Invoke-InitialSourceDump -Root $Root -SourceRoot $sourceRoot -Manifest $manifest
+        # A successful optional dump may have populated EXPORT_PATH only now.
+        # Refresh the generated context after that step, keeping user edits.
+        if ($sourceDumped) {
+            Invoke-OpenSpecProjectMd -Root $Root -Manifest $manifest
+            Write-Manifest -Root $Root -Manifest $manifest
+        }
+    }
 }
 
 # Feature announcement for the active-model adaptation layer. Shown on every
@@ -4361,7 +4859,7 @@ function Write-RulesModelAnnouncement {
     Write-Info "Адаптация правил под модель: введите /rulesmodel <модель> в чате AI-клиента (название — в любом"
     Write-Info "написании, команда сама его распознает; /rulesmodel auto — определить текущую модель)."
     Write-Info "Поддерживаемые профили: opus5 (Claude Opus 5), sonnet5 (Claude Sonnet 5), fable5 (Claude Fable 5),"
-    Write-Info "gpt56 (GPT-5.6). Команда пишет AGENT_MODEL в .dev.env — действует на весь проект, включая новые чаты;"
+    Write-Info "gpt56 (GPT-5.6), gpt6 (GPT-6 Astra). Команда пишет AGENT_MODEL в .dev.env — действует на весь проект, включая новые чаты;"
     Write-Info "перерендер и перезапуск клиента не нужны. Профиль настраивает только стиль и инициативу (длина"
     Write-Info "отчётов, нарратив, делегирование, лишние самопроверки) и не ослабляет обязательные проверки."
     if ($current) {
@@ -4383,6 +4881,42 @@ function Write-EconomyModeAnnouncement {
     Write-Info "Действует на весь проект, включая новые чаты; выключение — /economymode off."
 }
 
+# Purchased / already-installed MCP bundle: the rules installer never issues
+# a key. A non-empty SUPPORT_KEY (ships with the MCP distribution) or an
+# external INSTALL.md-mode-3 tree is enough to skip the buy reminder.
+function Test-McpBundleSignal {
+    param(
+        [string]$Root,
+        $ExternalMcp = $null
+    )
+    if (-not $ExternalMcp) {
+        $ExternalMcp = Resolve-ExternalMcpMode -ProjectRoot $Root
+    }
+    if ($ExternalMcp -and $ExternalMcp.Mode -eq 'external') { return $true }
+    $envPath = Join-Path $Root $script:DevEnvFileName
+    if (Test-Path $envPath) {
+        $keys = Read-DevEnvKeys -Path $envPath
+        if ($keys.Contains('SUPPORT_KEY') -and -not [string]::IsNullOrWhiteSpace([string]$keys['SUPPORT_KEY'])) {
+            return $true
+        }
+    }
+    return $false
+}
+
+# Shown on init / update when MCP is not installed and the installer has no
+# key to hand out. Same wording as AGENT-INSTALL.md / /updaterules / /checkupdates.
+function Write-McpEffectivenessReminder {
+    param(
+        [string]$Root,
+        $ExternalMcp = $null
+    )
+    if (Test-McpBundleSignal -Root $Root -ExternalMcp $ExternalMcp) { return }
+    Write-Info ""
+    Write-Info "Правила работают наиболее эффективно с MCP-серверами для 1С: https://vibecoding1c.ru/mcp_server"
+    Write-Info "Комплект уже куплен — после перезапуска клиента запустите /installtools или /installmcp."
+    Write-Info "Нет комплекта — страница покупки по ссылке. Установщик правил ключ MCP не выдаёт."
+}
+
 # Offer the single tool-installation entry point after a first install and
 # whenever an update introduces one or more new standalone installers. The
 # slash command performs detection and asks before making any tool changes.
@@ -4393,7 +4927,7 @@ function Write-InstallToolsAnnouncement {
     if (@($NewInstallers).Count -gt 0) {
         Write-Info "Добавлены новые установщики инструментов: $(@($NewInstallers) -join ', ')."
     }
-    Write-Info "После перезапуска AI-клиента запустите /installtools — команда сначала предложит установить приобретённый комплект 1С MCP, затем покажет Cognee, EDT-MCP и инструменты UI-автоматизации."
+    Write-Info "После перезапуска AI-клиента запустите /installtools — команда сначала предложит установить приобретённый комплект 1С MCP, затем покажет Cognee, OpenViking, EDT-MCP, инструменты UI-автоматизации, rtk и Atlassian MCP (Jira/Confluence)."
     Write-Info "Каждый пункт устанавливается только после подтверждения; отдельные команды установки также доступны."
 }
 
@@ -4499,6 +5033,96 @@ function Assert-OpenCodeAgentFrontmatter {
     Write-Err "Fix: re-run ``install.ps1 update -Source <clone> -AssumeYes -ForcePaths .opencode/agent/*`` (PowerShell channel applies toolsToPermission)."
     Write-Err "Do NOT copy content/agents/*.md into .opencode/agent/ verbatim — that breaks OpenCode."
     throw "OpenCode agent frontmatter gate failed ($($result.Violations.Count) file(s)). See errors above."
+}
+
+# Abstract tool vocabulary that only content/agents/*.md may use. Hosts match
+# `tools` entries against their own tool registry, so any of these left in an
+# installed agent file resolves to nothing.
+$script:AbstractToolNames = @('Shell', 'MCP')
+
+# Hard gate: installed agent markdown must NOT keep the abstract `tools`
+# vocabulary. Claude Code / Kimi / Qwen read `tools` as a strict allowlist of
+# their own tool names, so `Shell` and `MCP` match nothing and the subagent
+# launches without shell and without a single MCP server (the
+# 1c-metadata-manager toolchain and the 1c-explorer MCP-first chain both die
+# there). Cursor does not document the field at all, so the abstract list is
+# an undocumented key there and its read-only intent has to go through
+# `readonly`. The adapters convert the list via `frontmatter.toolsToDenylist`
+# / `toolsToFlag` — this check catches agent-channel installs that skipped the
+# transform and copied content/agents verbatim.
+function Test-AgentToolVocabulary {
+    param([string]$Root)
+
+    $dirs = @()
+    foreach ($rel in @('.claude/agents', '.kimi-code/agents', '.qwen/agents', '.cursor/agents', '.commandcode/agents', '.zcode/agents', '.mimocode/agents')) {
+        $abs = Join-Path $Root ($rel -replace '/', [IO.Path]::DirectorySeparatorChar)
+        if (Test-Path $abs) { $dirs += @{ Abs = $abs; Rel = $rel } }
+    }
+    if ($dirs.Count -eq 0) {
+        return @{ Ok = $true; Skipped = $true; Checked = 0; Violations = @() }
+    }
+
+    $violations = @()
+    $checked = 0
+    foreach ($d in $dirs) {
+        Get-ChildItem -Path $d.Abs -Filter '*.md' -File -ErrorAction SilentlyContinue | ForEach-Object {
+            $checked++
+            $relFile = ($d.Rel + '/' + $_.Name)
+            $text = Read-TextFile $_.FullName
+            $parts = Split-FrontmatterAndBody $text
+            $found = @()
+            foreach ($key in @('tools', 'disallowedTools')) {
+                if (-not $parts.Frontmatter -or -not $parts.Frontmatter.Contains($key)) { continue }
+                $val = $parts.Frontmatter[$key]
+                $entries =
+                    if ($val -is [System.Array]) { @($val | ForEach-Object { ([string]$_).Trim() }) }
+                    else { @(([string]$val) -split ',' | ForEach-Object { $_.Trim(' ', '[', ']', '"', "'") }) }
+                foreach ($e in $entries) {
+                    if ($script:AbstractToolNames -contains $e -and -not ($found -contains $e)) { $found += $e }
+                }
+            }
+            if ($found.Count -eq 0 -and $text -match '(?s)\A---\r?\n(.*?)\r?\n---') {
+                # Fallback: raw frontmatter text (parser miss / odd quoting).
+                # Scan the declaring line only: `MCP` and `Shell` are ordinary
+                # words in a `description`, and the body is full of both.
+                foreach ($fmLine in ($Matches[1] -split "`r?`n")) {
+                    if ($fmLine -notmatch '^\s*(tools|disallowedTools)\s*:') { continue }
+                    foreach ($abstract in $script:AbstractToolNames) {
+                        if ($fmLine -match ('(?<![\w-])' + $abstract + '(?![\w-])') -and -not ($found -contains $abstract)) {
+                            $found += $abstract
+                        }
+                    }
+                }
+            }
+            if ($found.Count -gt 0) {
+                $violations += "$relFile : frontmatter still uses the abstract tool name(s) $($found -join ', ') — no host understands them, and the ones that match tool names literally leave the subagent with no shell and no MCP server (see adapters/<tool>.yaml -> agents.frontmatter.toolsToDenylist / toolsToFlag)."
+            }
+        }
+    }
+
+    return @{
+        Ok         = ($violations.Count -eq 0)
+        Skipped    = $false
+        Checked    = $checked
+        Violations = $violations
+    }
+}
+
+function Assert-AgentToolVocabulary {
+    param([string]$Root)
+
+    $result = Test-AgentToolVocabulary -Root $Root
+    if ($result.Skipped) { return $result }
+    if ($result.Ok) {
+        Write-Info "Agent tool vocabulary OK: $($result.Checked) installed agent file(s)"
+        return $result
+    }
+
+    Write-Err "Agent tool vocabulary INVALID — $($result.Violations.Count) file(s) kept an abstract tool name:"
+    $result.Violations | ForEach-Object { Write-Err "  $_" }
+    Write-Err "Fix: re-run ``install.ps1 update -Source <clone> -AssumeYes -ForcePaths .claude/agents/*`` (substitute the affected directory; the PowerShell channel applies the adapter transform)."
+    Write-Err "Do NOT copy content/agents/*.md into a host agents directory verbatim, and do NOT just delete the tools line — that also drops the read-only guarantee."
+    throw "Agent tool vocabulary gate failed ($($result.Violations.Count) file(s)). See errors above."
 }
 
 function Invoke-Update {
@@ -4685,7 +5309,10 @@ function Invoke-Update {
     # userModified on every update.
     $newFiles = [ordered]@{}
     foreach ($k in $manifest.files.Keys) {
-        if ($manifest.files[$k].userModified -or $k -eq $script:AgentsMdFileName) { $newFiles[$k] = $manifest.files[$k] }
+        # Per-server MCP ownership must survive pruning so update can replace
+        # our servers while preserving pre-existing user servers with any id.
+        if ($manifest.files[$k].userModified -or $k -eq $script:AgentsMdFileName -or
+            $manifest.files[$k].Contains('managedServers')) { $newFiles[$k] = $manifest.files[$k] }
     }
     $manifest.files = $newFiles
 
@@ -4708,9 +5335,6 @@ function Invoke-Update {
     Write-Section 'OpenSpec artefacts (update)'
     Invoke-OpenSpecArtifacts -Root $Root -SourceRoot $sourceRoot -ActiveTools $activeTools -Manifest $manifest
 
-    Write-Section 'OpenSpec project.md (update / 1C autodetect)'
-    Invoke-OpenSpecProjectMd -Root $Root -Manifest $manifest
-
     # .dev.env runs before MCP so that {INFOBASE_PUBLISH_URL} placeholders in
     # `content/mcp-servers.json` resolve against the actual project value
     # when MCP configs are re-rendered.
@@ -4719,6 +5343,9 @@ function Invoke-Update {
     Invoke-LegacyInfobaseSettingsMigration -Root $Root -Manifest $manifest
     Ensure-EdtUsageSetting -Root $Root -Manifest $manifest
     Ensure-SupportSettings -Root $Root -Manifest $manifest
+
+    Write-Section 'OpenSpec project.md (update / 1C autodetect)'
+    Invoke-OpenSpecProjectMd -Root $Root -Manifest $manifest
 
     Write-Section 'MCP (update)'
     $extMcp = Resolve-ExternalMcpMode -ProjectRoot $Root
@@ -4750,6 +5377,9 @@ function Invoke-Update {
     Write-Section 'OpenCode agent frontmatter gate'
     Assert-OpenCodeAgentFrontmatter -Root $Root
 
+    Write-Section 'Agent tool vocabulary gate'
+    Assert-AgentToolVocabulary -Root $Root
+
     Write-Section 'Report'
     Write-Info 'Update complete.'
     $forced = @($script:ForcedThisRun)
@@ -4765,6 +5395,7 @@ function Invoke-Update {
     if (-not $hadEconomyCommand) { Write-EconomyModeAnnouncement }
     if (-not $hadRulesModelCommand) { Write-RulesModelAnnouncement -Root $Root }
     Write-RestartRecommendation -ActiveTools $activeTools -McpCount $manifest.mcpServers.Count
+    Write-McpEffectivenessReminder -Root $Root -ExternalMcp $extMcp
     $currentToolInstallerNames = @(
         Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'content\commands') -Filter 'install*.md' -File -ErrorAction SilentlyContinue |
             ForEach-Object { $_.Name } |
@@ -4845,6 +5476,9 @@ function Invoke-Add {
     Write-Section 'OpenCode agent frontmatter gate'
     Assert-OpenCodeAgentFrontmatter -Root $Root
 
+    Write-Section 'Agent tool vocabulary gate'
+    Assert-AgentToolVocabulary -Root $Root
+
     Write-Info "Added rules for $NewTool."
     Write-RestartRecommendation -ActiveTools $activeTools -McpCount $manifest.mcpServers.Count
 }
@@ -4859,7 +5493,8 @@ function Invoke-Add {
 function Remove-McpKeyFromConfig {
     param(
         [string]$Path,
-        [string]$Key = 'mcp'
+        [string]$Key = 'mcp',
+        [System.Collections.IDictionary]$Entry
     )
     if (-not (Test-Path $Path)) { return }
     if (-not $Key) { $Key = 'mcp' }
@@ -4869,6 +5504,27 @@ function Remove-McpKeyFromConfig {
     }
     catch {
         # Not valid JSON — do not touch a file we cannot safely parse.
+        return
+    }
+    if ($Entry -and $Entry.Contains('managedServers')) {
+        $kept = ConvertTo-OrderedHashtable $obj
+        $servers = Get-McpConfigMap -Config $kept -Key $Key
+        if ($null -eq $servers) { return }
+        foreach ($id in @($Entry['managedServers'])) {
+            if ($servers.Contains($id)) { [void]$servers.Remove($id) }
+        }
+        # Prune empty containers, but preserve sibling settings at every level.
+        $parts = @($Key -split '\.')
+        for ($i = $parts.Count - 1; $i -ge 0; $i--) {
+            $parent = $kept
+            for ($j = 0; $j -lt $i; $j++) { $parent = $parent[$parts[$j]] }
+            if ($parent[$parts[$i]].Count -gt 0) { break }
+            [void]$parent.Remove($parts[$i])
+        }
+        if (@($kept.Keys | Where-Object { $_ -ne '$schema' }).Count -eq 0) {
+            Remove-Item -LiteralPath $Path -Force
+        }
+        else { Write-TextFile -Path $Path -Content ((ConvertTo-Json $kept -Depth 20) + "`n") }
         return
     }
     $kept = [ordered]@{}
@@ -4921,6 +5577,8 @@ function Invoke-Remove {
             'kimi'          { $toolPrefixes = @('.kimi-code/', '.kimi/') }
             'qwen'          { $toolPrefixes = @('.qwen/', 'QWEN.md') }
             'cline'         { $toolPrefixes = @('.cline/', '.clinerules/') }
+            'zcode'         { $toolPrefixes = @('.zcode/') }
+            'mimocode'      { $toolPrefixes = @('.mimocode/', 'mimocode.json') }
             'pi'            { $toolPrefixes = @('.pi/') }
             'cursor'        { $toolPrefixes = @('.cursor/') }
             'other'         { $toolPrefixes = @('.ai-agent/') }
@@ -4962,7 +5620,7 @@ function Invoke-Remove {
                 # Shared config (opencode.json / .kilo/kilo.json /
                 # `.qwen/settings.json`): strip the merge key only, never
                 # delete the user's whole config.
-                Remove-McpKeyFromConfig -Path $abs -Key (Get-MergedMcpKey $entry)
+                Remove-McpKeyFromConfig -Path $abs -Key (Get-MergedMcpKey $entry) -Entry $entry
             }
             elseif (Test-Path $abs) {
                 Remove-Item -Force $abs -ErrorAction SilentlyContinue
@@ -5003,7 +5661,7 @@ function Invoke-Remove {
                 # Shared config (opencode.json / .kilo/kilo.json /
                 # `.qwen/settings.json`): strip the merge key only, never
                 # delete the user's whole config.
-                Remove-McpKeyFromConfig -Path $abs -Key (Get-MergedMcpKey $entry)
+                Remove-McpKeyFromConfig -Path $abs -Key (Get-MergedMcpKey $entry) -Entry $entry
             }
             elseif (Test-Path $abs) {
                 Remove-Item -Force $abs -ErrorAction SilentlyContinue

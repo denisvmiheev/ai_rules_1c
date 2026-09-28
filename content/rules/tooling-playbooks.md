@@ -1,163 +1,122 @@
 ---
-description: Per-task MCP tool playbooks (writing code, review, refactoring — including the safe-refactoring method and mandatory pre-refactor impact analysis, error fixing, performance, forms, integrations, documentation)
+description: Per-task MCP tool playbooks — code writing, review, architecture, error fixing, performance, safe refactoring with impact analysis, metadata XML, forms, integrations. Load for code / review / debug / refactor / performance / metadata work.
 alwaysApply: false
 category: tooling
 ---
 
 # Tool Usage by Task — Playbooks
 
-The MCP server catalog, fallback order (`edt-mcp` model-based search/navigation → `search_in_code` literal/regex retry → native `Grep` for project-source search), and per-server tool descriptors live in the `mcp-1c-tools` skill (`content/skills/mcp-1c-tools/SKILL.md`, `docs/<server>.md`). `AGENTS.md` only defines the short obligation rules and points here.
-
-> A project running the classic docker distribution instead of `edt-mcp` substitutes the corresponding tools per `content/skills/mcp-1c-tools/docs/edt-mcp.md`'s remap table (e.g. `search_in_code` → `codesearch`/`search_code`, `get_metadata_details` → `get_object_dossier`, `find_references`/`get_method_call_hierarchy` → `trace_impact`/`trace_call_chain`/`graph_dependencies`); the sequencing and evidence discipline below is unchanged.
-
-**EDT projects.** When `.dev.env` `USE_EDT=true`, these playbooks still apply — the additions (source-format check before metadata steps, EDT validation markers alongside the BSL validators, EDT-side DB update, form snapshots) live in `content/rules/edt-workflow.md`. Load it together with the playbook for the task.
+Server catalog and routing — `content/skills/mcp-1c-tools/SKILL.md`; exact argument names and example calls — the operation skill it names (`1c-code-search`, `1c-meta-info`, `1c-impact`, `1c-form-inspect`, `1c-validate`, `1c-platform-help`, `1c-templates-memory`, `1c-live-ib`); search discipline — `content/rules/mcp-first-search.md`. In EDT projects (`.dev.env` `USE_EDT=true`) the playbooks apply unchanged and `content/rules/edt-workflow.md` adds the source-format check, EDT validation markers, EDT-side DB update and form snapshots.
 
 ## Minimum Evidence Matrix
 
-Use the smallest set that closes the real context gaps. Do not promote a task to a heavier path just to satisfy a generic checklist.
+Use the smallest set that closes the real context gaps; do not promote a task to a heavier path to satisfy a checklist.
 
 | Task shape | Required before edit | Required after edit |
 |---|---|---|
-| **Quick-fix BSL** (one logical change in one module, no metadata / transaction / public-contract impact) | Read the target module / procedure and any directly referenced helper needed to understand the bug | `revalidate_objects/validate_query` → `get_project_errors` → `get_check_description/get_problem_summary` on the touched module; quick-fix reduces process overhead, not verification depth |
-| **Full-cycle BSL** | `templatesearch` when a reusable pattern may exist; `search_in_code` for local patterns; `get_metadata_details` / `get_metadata_objects` when metadata shape affects the code; platform / БСП / ITS docs only when versioned API or standard behaviour matters; **platform-capability check** (`docsearch` → `docinfo`, + `ssl_search`) whenever the task enters a specialized domain — cryptography, СЛАУ / numerical methods, data analysis, collaboration system / bots, integration bus / queues, full-text search, regex (`AGENTS.md → MCP Tool Calling → A.7`) | `revalidate_objects/validate_query` → `get_project_errors` → `get_check_description/get_problem_summary`; impact analysis when public surface or metadata usage changed |
-| **Metadata XML / forms** | Similar object/form examples, metadata lookup, `revalidate_objects`; **mutations go through the `1c-metadata-manage` skill** — hard gate, exceptions only per `SKILL.md → Hard rule` | `revalidate_objects`; metadata validation / form compilation where applicable |
-| **Integrations / platform APIs** | Existing integrations, templates, relevant БСП APIs, platform docs for exact API names / version availability, security requirements | `revalidate_objects/validate_query` → `get_project_errors` → `get_check_description/get_problem_summary`; `v8std_search`/`v8std_explain_diagnostics` on `v8std-local` when relying on an ITS standard |
-| **Markdown / rules / docs** | Read affected docs and referenced files needed for consistency | Structural checks only: paths, links, anchors, duplicate / conflicting wording |
+| **Quick-fix BSL** | The target module / procedure and any directly referenced helper needed to understand the change | The validator chain of the active `VERIFICATION_DEPTH` on the touched module (default `standard`: `revalidate_objects` → `get_project_errors` → `get_check_description` / `get_problem_summary`; `verification-policy.md → Verification depth levels`) |
+| **Full-cycle BSL** | Common preamble below; `search_in_code` for local patterns; `get_metadata_details` / `get_metadata_objects` when metadata shape affects the code; platform / БСП / ITS docs only when a versioned API or standard matters | The validator chain; impact analysis when public surface or metadata usage changed (`verification-gates.md → Gate 4`) |
+| **Metadata / forms** | Similar object / form examples (`get_objects_by_tags`), metadata lookup; **the mutation goes through the `1c-metadata-manage` skill** (hard gate, `AGENTS.md → Skills and Subagents`; on EDT projects the typed `edt-mcp` API) | `revalidate_objects` → `get_project_errors` on the changed FQNs; a form snapshot when layout is the point |
+| **Integrations / platform APIs** | Existing integrations, templates, relevant БСП APIs, platform docs for exact API names and version availability, security requirements | The validator chain; ITS check when relying on an ITS standard |
+| **Markdown / rules / docs** | Affected docs and the files they reference | Structural checks only: paths, links, anchors, duplicate / conflicting wording |
+
+## Common preamble — every playbook that writes or changes BSL
+
+0. **Platform-capability check** when the task enters a specialized domain (cryptography, СЛАУ / numerical methods, data analysis, collaboration system / bots, integration bus / queues, full-text search, regex, …) — `AGENTS.md → MCP Tool Calling → A.7`.
+1. **`recall`** with the task's key terms — `content/rules/project-memory.md`.
+2. **`templatesearch`** — task text verbatim; a hit is the base — `AGENTS.md → MCP Tool Calling → A.8–A.9`.
+
+The steps below assume the preamble is done. Validator steps are `revalidate_objects` (+ `validate_query` for new query text) → `get_project_errors` → `get_check_description` / `get_problem_summary` within `verification-policy.md → Validator budget`.
 
 ## Writing New Code
 
-Load `content/rules/coding-standards.md` first; for forms use `forms.md`, for non-trivial queries use `query-design.md`.
+Load `content/rules/coding-standards.md` first; forms — `forms.md`; non-trivial queries — `query-design.md`.
 
-0. **Platform-capability check** — mandatory when the task requires a specialized capability (cryptography / digital signatures, СЛАУ / numerical methods, data analysis / ML, collaboration system / bots, integration bus / message queues, full-text search, regular expressions, and similar): `docsearch` by capability description → `docinfo` for exact names found, plus `ssl_search` where a БСП solution is plausible — **before** designing a custom implementation. **If found and usable — build on the platform / БСП mechanism** (`AGENTS.md → A.7`, `1C-docs-mcp.md → Using a found platform mechanism`); do not hand-roll a parallel equivalent.
-1. **recall** (`1c-templates-fastcode`) — project-memory lookup with the task's key terms (object name, subsystem, error text) at the start of any non-trivial task, per `AGENTS.md → Project memory`. Skip for genuinely greenfield topics the project has never touched.
-2. **templatesearch** — **`templatesearch` only** (`AGENTS.md → A.8`): pre-flight in `1c-templates-fastcode.md → Query formulation (templatesearch only)`; pass user's task verbatim; keyword salad is a defect. **If a matching template is returned — use it as the base** (`AGENTS.md → A.9`, `1c-templates-fastcode.md → Using a found template`); adapt only what the task requires; do not rewrite from scratch.
-3. **get_metadata_details** — full passport of the target metadata object (structure, forms, dependencies, code, roles) in a single call.
-4. **search_in_code** — review existing patterns in the configuration.
-5. **read_method_source** — read an existing procedure/function for reuse.
-6. **get_module_structure** — overview of the module you intend to edit.
-7. **get_metadata_objects** / **get_metadata_details** — verify metadata structure and attribute types.
-8. **get_content_assist** — discover available methods/properties of a context.
-9. **docinfo** — verify built-in functions by exact name; **docsearch** — search by description.
-10. **ssl_search** — find reusable БСП functions.
-11. **revalidate_objects/validate_query** — refresh markers for the touched objects; `write_module_source` already syntax-checked the write.
-12. **get_project_errors** — read the EDT findings (severity `BLOCKER`/`CRITICAL`/`MAJOR` first); `get_check_description` explains a check id.
-13. **get_problem_summary** — confirming totals pass after the fixes.
-14. **validate_query** (`edt-mcp`) — when the change introduces a new / non-trivial query string (module code, DCS data set, dynamic list), validate it offline before delivery. If the session also exposes AI-authoring MCP tools, treat their output as a draft and re-validate the same as hand-written code.
+1. `get_metadata_details` — passport of the target object (structure, forms, dependencies, code, roles).
+2. `search_in_code` — existing patterns in the configuration; `get_module_structure` / `read_method_source` — the module you will edit and an existing routine to reuse.
+3. `get_metadata_objects` / `get_metadata_details` — attribute names and types; `get_content_assist` — members of a context.
+4. `docinfo` (exact name) / `docsearch` (by description) — built-in functions; `ssl_search` — reusable БСП functions.
+5. Validator chain; then `validate_query` for every new / non-trivial query string, especially after AI generation.
 
 ## Code Review
 
-1. **search_in_code** — verify pattern compliance.
-2. **find_references** — object-level impact analysis of the change.
-3. **get_method_call_hierarchy** — routine-level BSL call chains, callers/callees.
-4. **get_metadata_objects** / **get_metadata_details** — correct metadata usage.
-5. **docinfo** — verify method/property existence; **docsearch** — search by description.
-6. **revalidate_objects/validate_query** — reject syntax-broken input before reviewing.
-7. **get_project_errors** (+ **get_check_description**) — bugs, performance and standards findings.
-8. **get_problem_summary** — severity totals; style compliance and marker-level findings; pair a finding's check id with **v8std_explain_diagnostics** (`v8std-local`) for the ITS standard behind it (see `docs/v8std.md`).
+1. `search_in_code` — pattern compliance.
+2. `find_references` — object-level impact; `get_method_call_hierarchy` — callers / callees.
+3. `get_metadata_objects` / `get_metadata_details` — metadata usage; `docinfo` / `docsearch` — method existence.
+4. Validator chain (`revalidate_objects` first — never review syntax-broken code).
+5. `v8std_explain_diagnostics` (`v8std-local`) — the ITS standard behind a finding.
 
 ## Architecture Design
 
 0. **Platform-capability check** — when the designed solution involves a specialized domain (cryptography, СЛАУ / numerical methods, data analysis, collaboration system / bots, integration bus / queues, full-text search, regex), verify via `docsearch` → `docinfo` (+ `ssl_search`) whether the platform / БСП already provides the mechanism before designing a custom one — `AGENTS.md → MCP Tool Calling → A.7`.
-1. **get_metadata_details** — passport of key metadata objects.
-2. **get_metadata_objects** / **get_metadata_details** — existing metadata structure.
-3. **find_references** — usages / reference map for the objects involved (single/multi-hop through EDT's own index — no recursive graph-database traversal, see `docs/edt-mcp.md → Coverage gaps`).
-4. **search_in_code** — existing architectural patterns.
-5. **get_method_call_hierarchy** — code coupling and call chains.
-6. **templatesearch** — architectural templates.
-7. **Coverage gap** — `edt-mcp` has no free-form AI-Q&A tool and no configuration-specific documentation search; rely on `docsearch`/`docinfo`/`ssl_search` plus reading the configuration directly.
+1. `get_metadata_details` — key objects; `get_metadata_objects` — existing structure.
+2. `find_references` — dependency map for the objects involved (single hop through EDT's index — no recursive graph traversal, `docs/edt-mcp.md → Coverage gaps`).
+3. `search_in_code` — existing architectural patterns; `get_method_call_hierarchy` — coupling.
+4. `templatesearch` — architectural templates. Coverage gap: no free-form AI Q&A and no configuration-specific documentation search — rely on `docsearch` / `docinfo` / `ssl_search` plus reading the configuration directly.
 
 ## Error Fixing
 
-1. **recall** (`1c-templates-fastcode`) — check project memory for the error text / object name first: recurring errors and their fixes are stored there per `AGENTS.md → Project memory`.
-2. **get_event_log** (`edt-mcp`) — pull the failing event from the infobase event log offline (no running session): filter by period, user, severity, event / comment / metadata substring. Fall back to the Configurator's `ОтчетПоЖурналуРегистрации` / `ВыгрузитьЖурналРегистрации` only when the log files are unreachable.
-3. **revalidate_objects/validate_query** — syntax errors.
-4. **get_project_errors** — logic and performance issues.
-5. **get_module_structure** / **read_method_source** — locate and read the failing procedure/function.
-6. **search_in_code** — related patterns.
-7. **read_module_source** — module context around the error.
-8. **get_method_call_hierarchy** — how the error propagates through the call chain.
-9. **docinfo** — verify function/method names; **docsearch** — fallback by description.
-10. **get_metadata_objects** / **get_metadata_details** — verify metadata names and attributes.
-11. **validate_query** (`edt-mcp`) — when the suspect path is a query string, validate it offline before deeper investigation.
-12. **get_applications** + **evaluate_expression** (`edt-mcp`, debug/Designer session — heavier-weight than a lightweight live-data check, see `docs/edt-mcp.md → Coverage gaps`) — read-only query or BSL-fragment check against the live IB to confirm a data-state or platform-version-specific hypothesis, only when a session is already open and static checks cannot answer the question. Default to read-only; **never** evaluate a mutation without explicit user consent.
+Method — `standards(name="systematic-debugging")` (`DEBUG_FAST_PATH` for directly evidenced root causes).
+
+1. `recall` — recurring errors and their fixes are stored there.
+2. `get_event_log` — exact text, timestamp and affected metadata of the failing event, read offline (no running session); skip when the scenario is not in the connected infobase's log. The Configurator's `ОтчетПоЖурналуРегистрации` is the fallback only when the log files are unreachable.
+3. `revalidate_objects` → `get_project_errors` — syntax and logic defects.
+4. `get_module_structure` / `read_method_source`, `search_in_code` — locate and understand the failing routine; `get_method_call_hierarchy` — propagation.
+5. `docinfo` / `docsearch`, `get_metadata_objects` / `get_metadata_details` — verify names the code relies on.
+6. `validate_query` (offline) → `get_applications` + `evaluate_expression` (read-only, debug session — heavier than a lightweight live-data check; never a mutation without explicit consent, `docs/edt-mcp.md → Safety and discipline`) — confirm a data-state or platform-behaviour hypothesis in the live IB, only when static checks cannot answer.
 
 ## Performance Optimization
 
-0. **Query tuning?** If the slow artifact is (or contains) a query — load `query-design.md` (router) and `content/skills/1c-metadata-manage/docs/query-optimization.md`, and walk its *Mandatory Optimization Checklist* item by item (temp-table indexing, redundant `РАЗЛИЧНЫЕ`, correlated subqueries, virtual-table parameters / periodicity, join-before-grouping). This applies to every «оптимизируй запрос» task even when no MCP server is exposed.
-1. **search_in_code** — locate slow patterns ("медленный запрос", "цикл по выборке").
-2. **get_method_call_hierarchy** — identify hot call chains.
-3. **find_references** — objects that cause cascading issues in the affected code paths.
-4. **get_metadata_objects** / **get_metadata_details** — verify indexes and metadata structure.
-5. **get_project_errors** — bottleneck analysis; re-validate the final state with
-   `revalidate_objects/validate_query` → `get_project_errors` → `get_check_description/get_problem_summary`.
-6. **templatesearch** — optimized templates.
-7. **v8std_search** (`v8std-local`) — ITS performance-standard clauses by topic ("оптимизация запроса", "индексация временных таблиц"); see `docs/v8std.md`.
-8. **validate_query** (`edt-mcp`) — validate the rewritten query offline; if a live-data comparison (row counts, Cartesian explosions, virtual-table state) is genuinely needed, use `debug_launch` + `evaluate_expression` on a test or copy IB only (heavier-weight debug-session tool, not a lightweight live-data service — see `docs/edt-mcp.md → Coverage gaps`).
+0. If the slow artifact is or contains a query — `query-design.md` and `content/skills/1c-metadata-manage/docs/query-optimization.md → Mandatory Optimization Checklist`, item by item, even when no MCP server is exposed.
+1. `search_in_code` (literal fragments of slow patterns) — slow patterns; `get_method_call_hierarchy` — hot chains; `find_references` — cascades; `start_profiling` → `stop_profiling` → `get_profiling_results` — measure instead of guessing.
+2. `get_metadata_details` — indexes and structure; establish the baseline result and the measured bottleneck.
+3. Reuse the common preamble's `templatesearch` result as the base when it fits; search again only for a newly identified gap. `v8std_search` (`v8std-local`) — applicable ITS performance standards **before** choosing the rewrite. Confirm the candidate preserves row multiplicity, values and other required behaviour.
+4. Adapt the matching template; run the validator chain after the edit.
+5. `validate_query` → a bounded read-only live comparison (`evaluate_expression`, test or copy IB) — compare results with the baseline, including duplicates and overlapping conditions, then compare performance. Parsing alone proves neither metadata resolution nor result equivalence (`verification-gates.md → Gate 3a`).
 
 ## Refactoring
 
-**Method — sequencing before tools.** Refactoring is high-risk because the user-visible behaviour must stay identical while the code shape changes:
+**Method.** Top-down analysis first: map entry points, callers, touched registers / metadata and the observable behaviour — no edit before you can state them. Bottom-up edits: lowest-level helpers first, callers integrate only after the helpers are clean and verified. No "while we're here" edits (`AGENTS.md → Surgical Changes`).
 
-1. **Top-down analysis first.** Map the entire chain of calls and data flow for the area you intend to change. Do not start editing until you can answer: what are the entry points, who calls what, what registers / metadata are touched, what is the observable behaviour.
-2. **Bottom-up edits.** Start with the lowest-level utility functions and work upward. Higher-level callers integrate the refactored helpers only after the helpers themselves are clean and verified.
-3. **No "while we're here" edits.** Out-of-scope cleanup belongs to a separate, explicit task — see `AGENTS.md → Surgical Changes`.
+**Pre-refactor impact analysis is mandatory** — steps 1–3 before touching the first line; when the impact MCPs are not exposed follow `verification-gates.md → Gate 4` graceful degradation, never refactor blind.
 
-**Pre-refactor impact analysis (steps 1–4 below) is mandatory** — run it before touching the first line. If the impact-analysis MCPs are not exposed in the session, follow the graceful-degradation procedure from `verification-gates.md → Gate 4`; do not refactor blind.
+**Pre-refactor impact analysis (steps 1–3) is mandatory** — run it before touching the first line. If the impact-analysis tools are not exposed in the session, follow the graceful-degradation procedure from `verification-gates.md → Gate 4`; do not refactor blind.
 
-1. **get_metadata_details** — passport of the object being refactored.
-2. **find_references** — what breaks on change; every type reference before renaming/removing.
-3. **get_method_call_hierarchy** — all callers.
-4. **search_in_code** — every code pattern related to the object.
-5. **search_in_code** (re-run after the edit) — post-refactor verification that no old references remain.
-7. Run the full closing gate from `verification-checklist.md` once. It applies
-   `revalidate_objects/validate_query` → `get_project_errors` → `get_check_description/get_problem_summary` in order and reuses fresh Stage 3
-   evidence instead of repeating validators on unchanged code.
-
-If the refactor is large enough to enter the subagent pipeline — delegate per
-`subagent-pipeline.md → Stage 3` (`1c-refactoring`).
+1. `get_metadata_details` — passport of the object.
+2. `find_references` — what breaks on change, every type reference before renaming / removing; `get_method_call_hierarchy` — all callers.
+3. `search_in_code` — every related code pattern; after the refactor again — no old references remain.
+4. The closing gate from `verification-gates.md` once, reusing fresh Stage 3 evidence. A refactor large enough for the subagent pipeline — `subagent-pipeline.md → Stage 3` (`1c-refactoring`).
 
 ## Generating / Modifying Metadata XML
 
-**Step 0 is the execution decision, not a formality.** Load the **`1c-metadata-manage`** skill (`SKILL.md` → domain doc, e.g. `meta-manage.md`) **before** writing or modifying any XML — the mutation itself is driven by the skill's tools (hard gate: `AGENTS.md → Skills and Subagents`, exceptions in `SKILL.md → Hard rule`). MCP calls below gather evidence around the skill run, they do not replace it.
+Step 0 is the execution decision: load the **`1c-metadata-manage`** skill (`SKILL.md` → domain doc) **before** writing or modifying any metadata — the mutation is driven by the skill's tools (hard gate, `AGENTS.md → Skills and Subagents`; exceptions in `SKILL.md → Hard rule`); on EDT projects that path is the typed `edt-mcp` API (`create_metadata` / `modify_metadata` / `delete_metadata` / `rename_metadata_object` / `adopt_metadata_object`). MCP calls gather evidence around the run, they do not replace it.
 
-1. **1c-metadata-manage skill** — read `SKILL.md`, dispatch to the domain doc; decide direct execution vs. `1c-metadata-manager` subagent per its Dispatch Strategy.
-2. **get_metadata_objects** (`names_only=true`) — similar objects as examples.
-3. **revalidate_objects** — XSD schema for the target metadata type.
-4. Execute the mutation via the skill's tools (scaffold / edit / compile scripts) against the schema and examples.
-5. **revalidate_objects** + the skill's validation scripts — validate; fix errors and re-validate.
+1. `get_metadata_objects` / `get_objects_by_tags` — similar objects as examples; `get_metadata_details` (`assignable: true`) — the property schema the mutation can set.
+2. The mutation itself; direct execution vs. the `1c-metadata-manager` subagent per the skill's Dispatch Strategy. Destructive operations are two-phase (preview, then `confirm=true`).
+3. `revalidate_objects` → `get_project_errors` on the changed FQNs; fix and re-validate.
 
 ## Form Analysis and Generation
 
-**Step 0 — same hard gate as above.** Creating or structurally modifying `Form.xml` / layouts goes through the **`1c-metadata-manage`** skill (`form-manage.md`, form-compile DSL) or the `1c-metadata-manager` subagent; load `forms.md` (router) for the design rules. Hand-writing `Form.xml` while the skill is available is a defect (`SKILL.md → Hard rule`).
+Same gate: forms are created or changed through the skill (`docs/form-manage.md`; on EDT projects `create_metadata` / `modify_metadata` on form FQNs) or the `1c-metadata-manager` subagent; design rules — `forms.md` (router). Hand-writing a form while the skill is available is a defect.
 
-1. **1c-metadata-manage skill** — `SKILL.md` → `form-manage.md` (+ `form-compile-dsl.md` for generation); direct execution vs. subagent per Dispatch Strategy.
-2. **get_objects_by_tags/get_tags** — similar existing forms in the configuration.
-3. **get_form_layout_snapshot** — structure of the found form (elements, bindings, commands, events).
-4. **get_metadata_objects** (`names_only=true`) — metadata objects for XML references.
-5. **revalidate_objects** (`"Форма"`) — XSD schema of `Form.xml`.
-6. Generate / modify the form via the skill's tools (form-scaffold / form-edit / form-compile), based on the examples and schema.
-7. **revalidate_objects** + form validation (`form-validate`) — validate; fix errors and re-validate.
+1. `get_objects_by_tags` — similar existing forms; `get_metadata_details` (form FQN) / `get_form_layout_snapshot` — their structure (elements, bindings, commands, events).
+2. `get_metadata_objects` — objects for references.
+3. The skill's form operations; `revalidate_objects` + `get_project_errors`; `get_form_layout_snapshot` to confirm the layout; fix and re-validate.
 
 ## Integrations
 
-Use this playbook when writing HTTP services / clients, REST integrations, file or message-queue exchanges, webhooks. Domain rules — `integrations-add.md`.
+Domain rules — `integrations-add.md`.
 
-1. **ssl_search** — check for ready-made БСП subsystems ("Интернет-поддержка пользователей", "Обмен данными", "Получение файлов из Интернета", "Цифровая подпись").
-2. **templatesearch** — integration templates (HTTP request, JSON parsing, signed payloads, retry policy).
-3. **search_in_code** (`semantic` mode) — existing integrations in the configuration ("HTTP запрос", "отправка JSON", "парсинг ответа").
-4. **docinfo** — verify platform types by exact name (`HTTPСоединение`, `HTTPЗапрос`, `ЧтениеJSON`, `ЗаписьJSON`, `ЗаписьXML`, `ЧтениеXML`).
-5. **docsearch** — fallback when the exact platform-API name is unknown.
-6. **revalidate_objects** — when the contract is XML with a known schema.
-7. **v8std_search** (`v8std-local`) — ITS articles on long-running operations, secure password storage, asynchronous external components; see `docs/v8std.md`.
-8. **list_modules** + **get_module_structure** — locate or extend the integration common module (typically `*HTTPClient`, `*Integration`, `*Exchange`).
-9. After implementation: **revalidate_objects/validate_query** → **get_project_errors** → **get_check_description/get_problem_summary**.
+1. `ssl_search` — ready-made БСП subsystems («Интернет-поддержка пользователей», «Обмен данными», «Получение файлов из Интернета», «Цифровая подпись»); `templatesearch` — integration templates.
+2. `search_in_code` («HTTP запрос», «отправка JSON», «парсинг ответа») — existing integrations; `list_modules` + `get_module_structure` — the integration common module (`*HTTPClient`, `*Integration`, `*Exchange`).
+3. `docinfo` — platform types by exact name (`HTTPСоединение`, `HTTPЗапрос`, `ЧтениеJSON`, `ЗаписьJSON`, `ЗаписьXML`, `ЧтениеXML`); `docsearch` when the name is unknown.
+4. `v8std_search` (`v8std-local`) — long-running operations, secure password storage, asynchronous external components.
+5. Validator chain.
 
 ## Documentation
 
-1. **search_in_code** — find code to document.
-2. **get_metadata_objects** / **get_metadata_details** — metadata structure.
-3. **get_module_structure** — list of procedures/functions.
-4. **docinfo** — documentation by exact name; **docsearch** — search by description.
-5. **get_platform_documentation** — existing help articles.
-6. **v8std_search** (`v8std-local`) — ITS methodology articles by topic; see `docs/v8std.md`.
-7. **Coverage gap** — no version-specific / cross-version platform-documentation-diff tool. For comparing platform versions, use `docinfo`/`docsearch` against the project's actual `PLATFORM_VERSION` and read the platform release notes directly when a cross-version comparison is genuinely needed.
+`search_in_code` / `get_module_structure` — code to document; `get_metadata_objects` / `get_metadata_details` — structure; `docinfo` / `docsearch` / `get_platform_documentation` — platform documentation; `v8std_search` (`v8std-local`) — methodological articles.
+
+## Comparing Platform Versions
+
+No dedicated diff tool. `get_platform_documentation` (`edt-mcp`, pinned to the project's platform version) and the `since` / availability fields in `docinfo` / `docsearch` citations answer "is it available in version X"; for a cross-version comparison read the platform release notes.

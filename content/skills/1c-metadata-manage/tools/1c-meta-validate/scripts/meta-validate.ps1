@@ -1,5 +1,14 @@
-﻿# meta-validate v1.12 — Validate 1C metadata object structure (+корневой <Type>: скаляр без структуры = ошибка)
+﻿# meta-validate v1.13 — Validate 1C metadata object structure (+корневой <Type>: скаляр без структуры = ошибка)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
+# Local (v1.13, same as meta-validate.py): the object, its form descriptors and
+# Form.xml files carry the version of Configuration.xml (1e/6e); every
+# GeneratedType category is required and named exactly (2); Default* /
+# Auxiliary*Form references resolve and match the form role (6f); a form binds
+# Description / Code only when the length is positive (6g), and the main object
+# form shows a mandatory Description nobody fills (6h, warning); names are unique
+# case-insensitively and across attributes, tabular sections, dimensions and
+# resources (8); InformationRegister forbids Periodicity and DefaultRecordSetForm
+# (12); a type spelled with an export folder name (cfg:Catalogs.X) is an error (16a).
 param(
 	[Parameter(Mandatory)]
 	[Alias('Path')]
@@ -99,6 +108,20 @@ for ($depth = 0; $depth -lt 4; $depth++) {
 		break
 	}
 	$probe = Split-Path $probe
+}
+
+# Format version of the configuration the object belongs to (local, checks 1e / 6e).
+$script:configVersion = ""
+if ($script:configDir) {
+	$cfgHeadPath = Join-Path $script:configDir "Configuration.xml"
+	try {
+		$cfgReader = New-Object System.IO.StreamReader($cfgHeadPath, [System.Text.Encoding]::UTF8)
+		$cfgBuffer = New-Object char[] 2000
+		$cfgRead = $cfgReader.Read($cfgBuffer, 0, 2000)
+		$cfgReader.Close()
+		$cfgHead = New-Object string($cfgBuffer, 0, $cfgRead)
+		if ($cfgHead -match '<MetaDataObject[^>]+version="(\d+\.\d+)"') { $script:configVersion = $Matches[1] }
+	} catch {}
 }
 
 # --- Output infrastructure ---
@@ -292,6 +315,46 @@ $forbiddenProperties = @{
 	"ChartOfAccounts"            = @("Autonumbering","Hierarchical")
 	"ChartOfCalculationTypes"    = @("CheckUnique","Autonumbering")
 	"ExchangePlan"               = @("CodeType","CheckUnique","Autonumbering")
+	# Local: the periodicity property is InformationRegisterPeriodicity, and an
+	# information register has no record-set default form.
+	"InformationRegister"        = @("Periodicity","DefaultRecordSetForm")
+}
+
+# GeneratedType names that do not follow <Type><Category>.<Name> (Designer dumps).
+$generatedTypePrefixExceptions = @{
+	"DefinedType|DefinedType"                                  = "DefinedType"
+	"ChartOfCharacteristicTypes|Characteristic"                = "Characteristic"
+	"CalculationRegister|Recalcs"                              = "RecalculationsManager"
+	"ChartOfCalculationTypes|DisplacingCalculationTypes"       = "DisplacingCalculationTypes"
+	"ChartOfCalculationTypes|DisplacingCalculationTypesRow"    = "DisplacingCalculationTypesRow"
+	"ChartOfCalculationTypes|BaseCalculationTypes"             = "BaseCalculationTypes"
+	"ChartOfCalculationTypes|BaseCalculationTypesRow"          = "BaseCalculationTypesRow"
+	"ChartOfCalculationTypes|LeadingCalculationTypes"          = "LeadingCalculationTypes"
+	"ChartOfCalculationTypes|LeadingCalculationTypesRow"       = "LeadingCalculationTypesRow"
+}
+
+# Export folder names that are sometimes written where a type belongs
+# (cfg:Catalogs.X instead of cfg:CatalogRef.X) -> the reference type, if any.
+$exportFolderTypes = @{
+	"Catalogs" = "CatalogRef"; "Documents" = "DocumentRef"; "Enums" = "EnumRef"
+	"ChartsOfAccounts" = "ChartOfAccountsRef"
+	"ChartsOfCharacteristicTypes" = "ChartOfCharacteristicTypesRef"
+	"ChartsOfCalculationTypes" = "ChartOfCalculationTypesRef"
+	"BusinessProcesses" = "BusinessProcessRef"; "ExchangePlans" = "ExchangePlanRef"
+	"Tasks" = "TaskRef"; "DefinedTypes" = "DefinedType"
+	"InformationRegisters" = ""; "AccumulationRegisters" = ""; "AccountingRegisters" = ""
+	"CalculationRegisters" = ""; "Constants" = ""; "DataProcessors" = ""; "Reports" = ""
+	"DocumentJournals" = ""
+}
+$exportFolderNames = @($exportFolderTypes.Keys)
+
+# Default*Form / Auxiliary*Form property -> role its form must have. Choice forms are
+# not role-checked: vendor configurations point DefaultChoiceForm at object forms.
+$defaultFormRoles = @{
+	"DefaultObjectForm" = "object"; "AuxiliaryObjectForm" = "object"
+	"DefaultFolderForm" = "object"; "AuxiliaryFolderForm" = "object"
+	"DefaultRecordForm" = "record"; "AuxiliaryRecordForm" = "record"
+	"DefaultListForm" = "list"; "AuxiliaryListForm" = "list"
 }
 
 # --- 1. Parse XML ---
@@ -344,6 +407,9 @@ if ($root.NamespaceURI -ne $expectedNs) {
 $version = $root.GetAttribute("version")
 if (-not $version) {
 	Report-Warn "1. Missing version attribute on MetaDataObject"
+} elseif ($script:configVersion -and $version -ne $script:configVersion) {
+	Report-Error "1e. Format version '$version' differs from Configuration.xml ($($script:configVersion)) — the Configurator refuses to load a dump with mixed format versions"
+	$check1Ok = $false
 } elseif ($version -ne "2.17" -and $version -ne "2.20") {
 	Report-Warn "1. Unusual version '$version' (expected 2.17 or 2.20)"
 }
@@ -444,9 +510,17 @@ if ($typesWithoutInternalInfo -contains $mdType) {
 			$gtCategory = $gt.GetAttribute("category")
 			$foundCategories += $gtCategory
 
-			# Validate name format: Prefix.ObjectName
+			# Validate name format: exactly <Type><Category>.<Name> for a known category
 			if ($gtName -and $objName -ne "(unknown)") {
-				if (-not $gtName.EndsWith(".$objName")) {
+				if ($expectedCategories -ccontains $gtCategory) {
+					$exceptionKey = "$mdType|$gtCategory"
+					$gtPrefix = if ($generatedTypePrefixExceptions.ContainsKey($exceptionKey)) { $generatedTypePrefixExceptions[$exceptionKey] } else { "$mdType$gtCategory" }
+					$expectedGtName = "$gtPrefix.$objName"
+					if ($gtName -cne $expectedGtName) {
+						Report-Error "2. GeneratedType '$gtCategory' name '$gtName' — expected '$expectedGtName'"
+						$check2Ok = $false
+					}
+				} elseif (-not $gtName.EndsWith(".$objName")) {
 					Report-Error "2. GeneratedType name '$gtName' does not end with '.$objName'"
 					$check2Ok = $false
 				}
@@ -482,9 +556,10 @@ if ($typesWithoutInternalInfo -contains $mdType) {
 		}
 
 		# Check count mismatch
-		$missingCats = @($expectedCategories | Where-Object { $foundCategories -notcontains $_ })
+		$missingCats = @($expectedCategories | Where-Object { $foundCategories -cnotcontains $_ })
 		if ($missingCats.Count -gt 0) {
-			Report-Warn "2. Missing GeneratedType categories: $($missingCats -join ', ')"
+			Report-Error "2. Missing GeneratedType categories: $($missingCats -join ', ') — every category of $mdType is required"
+			$check2Ok = $false
 		}
 
 		if ($check2Ok) {
@@ -675,6 +750,289 @@ if ($childObjNode) {
 
 if ($script:stopped) { & $finalize; exit 1 }
 
+# --- Check 6a/6b (local): form registrations are references, and they resolve ---
+#
+# A form is registered in ChildObjects as a scalar reference — <Form>Name</Form> —
+# and described by its own file, <ObjectDir>/Forms/<Name>.xml. Both halves are
+# needed and neither was checked: an inline <Form uuid=...><Properties>… block
+# (what a generic child builder produces) and a reference with no file behind it
+# both passed as valid, and the defect only surfaced when the Configurator tried
+# to load the dump.
+
+if ($childObjNode) {
+	$formNodes = @($childObjNode.ChildNodes | Where-Object { $_.NodeType -eq 'Element' -and $_.LocalName -eq 'Form' })
+	if ($formNodes.Count -gt 0) {
+		$objectDir = Join-Path (Split-Path $resolvedPath -Parent) ([System.IO.Path]::GetFileNameWithoutExtension($resolvedPath))
+		$formsDir = Join-Path $objectDir 'Forms'
+		$check6aOk = $true
+		$check6bOk = $true
+		$check6cOk = $true
+		$check6dOk = $true
+		$resolvedForms = 0
+		foreach ($formNode in $formNodes) {
+			$inlineChildren = @($formNode.ChildNodes | Where-Object { $_.NodeType -eq 'Element' })
+			if ($inlineChildren.Count -gt 0) {
+				$inlineName = $formNode.SelectSingleNode('md:Properties/md:Name', $ns)
+				$shown = if ($inlineName) { $inlineName.InnerText } else { '<без имени>' }
+				Report-Error "6a. ChildObjects/Form '$shown' описана вложенным дескриптором внутри объекта. Регистрация формы — скалярная ссылка <Form>$shown</Form>, а свойства формы живут в Forms/$shown.xml. Такую выгрузку Конфигуратор не загрузит; создавайте форму навыком form-add."
+				$check6aOk = $false
+				continue
+			}
+			$formName = $formNode.InnerText.Trim()
+			if (-not $formName) {
+				Report-Error "6a. ChildObjects/Form: пустая регистрация формы (нет имени)"
+				$check6aOk = $false
+				continue
+			}
+			$formMeta = Join-Path $formsDir "$formName.xml"
+			if (-not (Test-Path -LiteralPath $formMeta)) {
+				Report-Error "6b. Форма '$formName' зарегистрирована в ChildObjects, но её описание не найдено: $formMeta"
+				$check6bOk = $false
+				continue
+			}
+			# 6c/6d: the descriptor has to be a real, matching descriptor, not just a path
+			# that exists. A scaffolder that interpolates an unescaped user string writes a
+			# file the Configurator cannot read, and an existence check reports that dump
+			# as valid.
+			$formDoc = New-Object System.Xml.XmlDocument
+			try { $formDoc.Load($formMeta) }
+			catch {
+				Report-Error "6c. Дескриптор формы '$formName' не разбирается как XML: $formMeta — $($_.Exception.Message). Такую выгрузку Конфигуратор не загрузит."
+				$check6cOk = $false
+				continue
+			}
+			$declaredNode = $formDoc.SelectSingleNode("/*[local-name()='MetaDataObject']/*[local-name()='Form']/*[local-name()='Properties']/*[local-name()='Name']")
+			$declared = if ($declaredNode) { $declaredNode.InnerText.Trim() } else { "" }
+			if (-not $declared) {
+				Report-Error "6d. В дескрипторе $formMeta нет Form/Properties/Name — форма '$formName' зарегистрирована, но не описана."
+				$check6dOk = $false
+				continue
+			}
+			if ($declared -cne $formName) {
+				Report-Error "6d. Имя в дескрипторе не совпадает с регистрацией: $formMeta описывает '$declared', а ChildObjects ссылается на '$formName'."
+				$check6dOk = $false
+				continue
+			}
+			$resolvedForms++
+		}
+		if ($check6aOk) { Report-OK "6a. Form registrations: $($formNodes.Count) scalar reference(s)" }
+		if ($check6bOk) { Report-OK "6b. Form descriptors: $resolvedForms of $($formNodes.Count) resolved on disk" }
+		if ($check6cOk) { Report-OK "6c. Form descriptors parse as XML: $resolvedForms" }
+		if ($check6dOk) { Report-OK "6d. Form descriptor names match their registration: $resolvedForms" }
+	}
+}
+
+if ($script:stopped) { & $finalize; exit 1 }
+
+# --- Checks 6e-6g (local): versions, default-form references, standard fields ---
+#
+# 6e: a form descriptor and its Form.xml carry the version of Configuration.xml.
+# 6f: a Default*/Auxiliary*Form property names a form of this object that is
+#     declared in ChildObjects (or an existing common form), and an object,
+#     record or list slot points at a form with that role (main attribute type).
+# 6g: a form whose main attribute is this object binds <Main>.Description /
+#     <Main>.Code only when DescriptionLength / CodeLength is positive — with 0
+#     the standard attribute does not exist.
+
+$declaredForms = @()
+if ($childObjNode) {
+	foreach ($c in $childObjNode.ChildNodes) {
+		if ($c.NodeType -ne 'Element' -or $c.LocalName -ne 'Form') { continue }
+		if (@($c.ChildNodes | Where-Object { $_.NodeType -eq 'Element' }).Count -gt 0) { continue }
+		$fn = $c.InnerText.Trim()
+		if ($fn) { $declaredForms += $fn }
+	}
+}
+$objectDirPath = Join-Path (Split-Path $resolvedPath -Parent) ([System.IO.Path]::GetFileNameWithoutExtension($resolvedPath))
+$script:formRoots = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([System.StringComparer]::Ordinal)
+$lfNs = New-Object System.Xml.XmlNamespaceManager((New-Object System.Xml.NameTable))
+$lfNs.AddNamespace("f", "http://v8.1c.ru/8.3/xcf/logform")
+$lfNs.AddNamespace("v8", "http://v8.1c.ru/8.1/data/core")
+
+function Get-FormXmlRoot([string]$formName) {
+	# Parsed Ext/Form.xml of a declared managed form, or $null (ordinary / absent).
+	# Keys are compared case-sensitively, as the Python runtime does.
+	if ($script:formRoots.ContainsKey($formName)) { return $script:formRoots[$formName] }
+	$path = Join-Path (Join-Path (Join-Path (Join-Path $objectDirPath "Forms") $formName) "Ext") "Form.xml"
+	$rootEl = $null
+	if (Test-Path -LiteralPath $path) {
+		try {
+			$fdoc = New-Object System.Xml.XmlDocument
+			$fdoc.Load($path)
+			$rootEl = $fdoc.DocumentElement
+		} catch { $rootEl = $null }
+	}
+	$script:formRoots[$formName] = $rootEl
+	return $rootEl
+}
+
+function Get-FormMainAttribute($formRoot) {
+	# @{ Name; Types } of the main attribute of a managed form, or $null.
+	$fns = New-Object System.Xml.XmlNamespaceManager($formRoot.OwnerDocument.NameTable)
+	$fns.AddNamespace("f", "http://v8.1c.ru/8.3/xcf/logform")
+	$fns.AddNamespace("v8", "http://v8.1c.ru/8.1/data/core")
+	foreach ($attr in $formRoot.SelectNodes("f:Attributes/f:Attribute", $fns)) {
+		$main = $attr.SelectSingleNode("f:MainAttribute", $fns)
+		if ($main -and $main.InnerText.Trim() -eq "true") {
+			$types = @()
+			foreach ($t in $attr.SelectNodes(".//v8:Type", $fns)) { if ($t.InnerText.Trim()) { $types += $t.InnerText.Trim() } }
+			return @{ Name = $attr.GetAttribute("name"); Types = $types }
+		}
+	}
+	return $null
+}
+
+function Get-FormRole($formRoot) {
+	$main = Get-FormMainAttribute $formRoot
+	if (-not $main) { return "" }
+	$types = @($main.Types)
+	if ($types.Count -eq 1 -and $types[0] -ceq "cfg:DynamicList") { return "list" }
+	if ($types.Count -eq 1 -and $types[0] -cmatch '^cfg:\w+Object\.') { return "object" }
+	if ($types.Count -eq 1 -and $types[0] -cmatch '^cfg:\w+RecordManager\.') { return "record" }
+	return ""
+}
+
+if ($script:configVersion -and $declaredForms.Count -gt 0) {
+	$check6eOk = $true
+	foreach ($formName in $declaredForms) {
+		$descriptor = Join-Path (Join-Path $objectDirPath "Forms") "$formName.xml"
+		if (Test-Path -LiteralPath $descriptor) {
+			$dVersion = ""
+			try {
+				$ddoc = New-Object System.Xml.XmlDocument
+				$ddoc.Load($descriptor)
+				$dVersion = $ddoc.DocumentElement.GetAttribute("version")
+			} catch { $dVersion = "" }
+			if ($dVersion -and $dVersion -ne $script:configVersion) {
+				Report-Error "6e. Form descriptor '$formName' has version '$dVersion', Configuration.xml has '$($script:configVersion)'"
+				$check6eOk = $false
+			}
+		}
+		$formRoot = Get-FormXmlRoot $formName
+		if ($formRoot) {
+			$fVersion = $formRoot.GetAttribute("version")
+			if ($fVersion -and $fVersion -ne $script:configVersion) {
+				Report-Error "6e. Form '$formName' (Ext/Form.xml) has version '$fVersion', Configuration.xml has '$($script:configVersion)'"
+				$check6eOk = $false
+			}
+		}
+	}
+	if ($check6eOk) { Report-OK "6e. Form versions match Configuration.xml ($($script:configVersion)): $($declaredForms.Count) form(s)" }
+}
+
+if ($propsNode -and $objName -ne "(unknown)") {
+	$check6fOk = $true
+	$checkedRefs = 0
+	foreach ($prop in $propsNode.ChildNodes) {
+		if ($prop.NodeType -ne 'Element') { continue }
+		$propName = $prop.LocalName
+		if ($propName -cnotmatch '^(Default|Auxiliary)\w*Form$') { continue }
+		$ref = $prop.InnerText.Trim()
+		if (-not $ref) { continue }
+		$checkedRefs++
+		$parts = $ref.Split('.')
+		if ($parts.Count -eq 2 -and $parts[0] -ceq "CommonForm") {
+			if ($script:configDir -and -not (Test-Path -LiteralPath (Join-Path (Join-Path $script:configDir "CommonForms") "$($parts[1]).xml"))) {
+				Report-Error "6f. $propName = '$ref': common form '$($parts[1])' not found in CommonForms/"
+				$check6fOk = $false
+			}
+			continue
+		}
+		$ownPrefix = "$mdType.$objName.Form."
+		if ($parts.Count -ne 4 -or -not $ref.StartsWith($ownPrefix, [System.StringComparison]::Ordinal)) {
+			Report-Error "6f. $propName = '$ref': expected '$ownPrefix<Form>' or 'CommonForm.<Name>'"
+			$check6fOk = $false
+			continue
+		}
+		if ($declaredForms -cnotcontains $parts[3]) {
+			Report-Error "6f. $propName = '$ref': form '$($parts[3])' is not declared in ChildObjects"
+			$check6fOk = $false
+			continue
+		}
+		if (-not $defaultFormRoles.ContainsKey($propName)) { continue }
+		$expectedRole = $defaultFormRoles[$propName]
+		$formRoot = Get-FormXmlRoot $parts[3]
+		if (-not $formRoot) { continue }
+		$actualRole = Get-FormRole $formRoot
+		if ($actualRole -and $actualRole -ne $expectedRole) {
+			Report-Error "6f. $propName = '$ref': the form is a $actualRole form (main attribute type), expected a $expectedRole form"
+			$check6fOk = $false
+		}
+	}
+	if ($check6fOk -and $checkedRefs -gt 0) { Report-OK "6f. Default form references: $checkedRefs resolved" }
+}
+
+if ($propsNode -and $declaredForms.Count -gt 0 -and $objName -ne "(unknown)") {
+	$zeroFields = @()
+	foreach ($pair in @(@("DescriptionLength", "Description"), @("CodeLength", "Code"))) {
+		$lengthNode = $propsNode.SelectSingleNode("md:$($pair[0])", $ns)
+		if ($lengthNode -and $lengthNode.InnerText.Trim() -eq "0") { $zeroFields += ,$pair }
+	}
+	if ($zeroFields.Count -gt 0) {
+		$check6gOk = $true
+		$ownType = "cfg:$($mdType)Object.$objName"
+		foreach ($formName in $declaredForms) {
+			$formRoot = Get-FormXmlRoot $formName
+			if (-not $formRoot) { continue }
+			$main = Get-FormMainAttribute $formRoot
+			if (-not $main -or -not $main.Name) { continue }
+			$mainTypes = @($main.Types)
+			if ($mainTypes.Count -ne 1 -or $mainTypes[0] -cne $ownType) { continue }
+			$paths = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+			foreach ($dp in $formRoot.GetElementsByTagName("DataPath", "http://v8.1c.ru/8.3/xcf/logform")) { [void]$paths.Add($dp.InnerText.Trim()) }
+			foreach ($pair in $zeroFields) {
+				if ($paths.Contains("$($main.Name).$($pair[1])")) {
+					Report-Error "6g. Form '$formName' binds '$($main.Name).$($pair[1])', but $($pair[0])=0 — the object has no $($pair[1])"
+					$check6gOk = $false
+				}
+			}
+		}
+		if ($check6gOk) { Report-OK "6g. Standard fields: no binding to a zero-length $(($zeroFields | ForEach-Object { $_[1] }) -join '/')" }
+	}
+}
+
+# 6h (warning): the main object form of an object with a mandatory Description
+# (DescriptionLength > 0, FillChecking ShowError — the platform default without a
+# StandardAttributes block) does not show <Main>.Description, and neither the form
+# module nor the object / manager module assigns it: the item cannot be written
+# from that form. A warning, not an error — the value may be filled elsewhere.
+if ($propsNode -and $objName -ne "(unknown)") {
+	$descLengthNode = $propsNode.SelectSingleNode("md:DescriptionLength", $ns)
+	$descLength = if ($descLengthNode) { $descLengthNode.InnerText.Trim() } else { "" }
+	$defaultObjectNode = $propsNode.SelectSingleNode("md:DefaultObjectForm", $ns)
+	$defaultObjectRef = if ($defaultObjectNode) { $defaultObjectNode.InnerText.Trim() } else { "" }
+	$ownPrefix = "$mdType.$objName.Form."
+	if ($descLength -match '^\d+$' -and [int]$descLength -gt 0 -and $defaultObjectRef.StartsWith($ownPrefix, [System.StringComparison]::Ordinal) -and ($declaredForms -ccontains $defaultObjectRef.Substring($ownPrefix.Length))) {
+		$stdBlock = $propsNode.SelectSingleNode("md:StandardAttributes", $ns)
+		$fillNode = $propsNode.SelectSingleNode("md:StandardAttributes/xr:StandardAttribute[@name='Description']/xr:FillChecking", $ns)
+		$fillChecking = if ($fillNode) { $fillNode.InnerText.Trim() } elseif ($stdBlock) { "" } else { "ShowError" }
+		$defaultForm = $defaultObjectRef.Substring($ownPrefix.Length)
+		$formRoot = Get-FormXmlRoot $defaultForm
+		if ($fillChecking -ceq "ShowError" -and $formRoot) {
+			$main = Get-FormMainAttribute $formRoot
+			if ($main -and $main.Name -and @($main.Types).Count -eq 1 -and @($main.Types)[0] -ceq "cfg:$($mdType)Object.$objName") {
+				$paths = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::Ordinal)
+				foreach ($dp in $formRoot.GetElementsByTagName("DataPath", "http://v8.1c.ru/8.3/xcf/logform")) { [void]$paths.Add($dp.InnerText.Trim()) }
+				if (-not $paths.Contains("$($main.Name).Description")) {
+					$assigned = $false
+					foreach ($rel in @("Forms\$defaultForm\Ext\Form\Module.bsl", "Ext\ObjectModule.bsl", "Ext\ManagerModule.bsl")) {
+						$modulePath = Join-Path $objectDirPath $rel
+						if (Test-Path -LiteralPath $modulePath) {
+							$moduleText = [System.IO.File]::ReadAllText($modulePath, [System.Text.Encoding]::UTF8)
+							if ($moduleText -match '(?im)(?:\.\s*|^[ \t]*)(?:Наименование|Description)\s*=(?!=)') { $assigned = $true; break }
+						}
+					}
+					if (-not $assigned) {
+						Report-Warn "6h. Default object form '$defaultForm' does not show '$($main.Name).Description', which is mandatory (DescriptionLength=$descLength, FillChecking=ShowError), and no form, object or manager module assigns it — writing from this form fails unless the value is filled elsewhere"
+					}
+				}
+			}
+		}
+	}
+}
+
+if ($script:stopped) { & $finalize; exit 1 }
+
 # --- Check 7: Attributes/Dimensions/Resources/EnumValues/Columns — UUID, Name, Type ---
 
 function Check-ChildElement {
@@ -805,12 +1163,15 @@ if ($script:stopped) { & $finalize; exit 1 }
 # --- Check 8: Name uniqueness ---
 
 function Check-Uniqueness {
+	# 1C names are case-insensitive. Pass one shared $names hashtable to check several
+	# kinds against each other (attributes, tabular sections, dimensions, resources
+	# are fields of one object and share a namespace).
 	param(
 		[System.Xml.XmlNodeList]$nodes,
-		[string]$kind
+		[string]$kind,
+		[hashtable]$names = @{}
 	)
 
-	$names = @{}
 	$hasDupes = $false
 
 	foreach ($node in $nodes) {
@@ -820,11 +1181,17 @@ function Check-Uniqueness {
 		if (-not $elName -or -not $elName.InnerText) { continue }
 
 		$nameVal = $elName.InnerText
-		if ($names.ContainsKey($nameVal)) {
-			Report-Error "8. Duplicate $kind name: '$nameVal'"
+		$key = $nameVal.ToLowerInvariant()
+		if ($names.ContainsKey($key)) {
+			$other = $names[$key]
+			if ($other.Kind -ceq $kind -and $other.Name -ceq $nameVal) {
+				Report-Error "8. Duplicate $kind name: '$nameVal'"
+			} else {
+				Report-Error "8. $kind '$nameVal' clashes with $($other.Kind) '$($other.Name)' — names are case-insensitive and shared by attributes, tabular sections, dimensions and resources"
+			}
 			$hasDupes = $true
 		} else {
-			$names[$nameVal] = $true
+			$names[$key] = @{ Kind = $kind; Name = $nameVal }
 		}
 	}
 
@@ -834,28 +1201,13 @@ function Check-Uniqueness {
 if ($childObjNode) {
 	$check8Ok = $true
 
-	# Attributes
-	$attrs = $childObjNode.SelectNodes("md:Attribute", $ns)
-	if ($attrs.Count -gt 0) {
-		if (-not (Check-Uniqueness -nodes $attrs -kind "Attribute")) { $check8Ok = $false }
-	}
-
-	# TabularSections
-	$tss = $childObjNode.SelectNodes("md:TabularSection", $ns)
-	if ($tss.Count -gt 0) {
-		if (-not (Check-Uniqueness -nodes $tss -kind "TabularSection")) { $check8Ok = $false }
-	}
-
-	# Dimensions
-	$dims = $childObjNode.SelectNodes("md:Dimension", $ns)
-	if ($dims.Count -gt 0) {
-		if (-not (Check-Uniqueness -nodes $dims -kind "Dimension")) { $check8Ok = $false }
-	}
-
-	# Resources
-	$ress = $childObjNode.SelectNodes("md:Resource", $ns)
-	if ($ress.Count -gt 0) {
-		if (-not (Check-Uniqueness -nodes $ress -kind "Resource")) { $check8Ok = $false }
+	# Attributes, TabularSections, Dimensions, Resources — one shared namespace
+	$fieldNames = @{}
+	foreach ($fieldKind in @("Attribute", "TabularSection", "Dimension", "Resource")) {
+		$fieldNodes = $childObjNode.SelectNodes("md:$fieldKind", $ns)
+		if ($fieldNodes.Count -gt 0) {
+			if (-not (Check-Uniqueness -nodes $fieldNodes -kind $fieldKind -names $fieldNames)) { $check8Ok = $false }
+		}
 	}
 
 	# EnumValues
@@ -1438,6 +1790,28 @@ if ($childObjNode) {
 	if ($check15Ok -and $cmdCount -gt 0) {
 		Report-OK "15. Commands: $cmdCount command(s), groups valid"
 	}
+}
+
+# --- Check 16a (local): a type spelled with an export folder name ---
+# cfg:Catalogs.X is the directory of the dump, not a type; the platform refuses it.
+# Checked without a configuration directory: the spelling is wrong on its own.
+
+$folderTypeValues = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([System.StringComparer]::Ordinal)
+foreach ($tn in $root.SelectNodes("//v8:Type | //v8:TypeSet", $ns)) {
+	$tv = $tn.InnerText.Trim()
+	if (-not $tv) { continue }
+	$bare = if ($tv.Contains(":")) { $tv.Substring($tv.IndexOf(":") + 1) } else { $tv }
+	if (-not $bare.Contains(".")) { continue }
+	$headSeg = $bare.Substring(0, $bare.IndexOf("."))
+	if ($exportFolderNames -ccontains $headSeg) { $folderTypeValues[$tv] = $headSeg }
+}
+$folderTypeKeys = [string[]]@($folderTypeValues.Keys)
+[Array]::Sort($folderTypeKeys, [System.StringComparer]::Ordinal)
+foreach ($tv in $folderTypeKeys) {
+	$headSeg = $folderTypeValues[$tv]
+	$refKind = $exportFolderTypes[$headSeg]
+	$hint = if ($refKind) { " — a reference type is '$refKind.<Name>'" } else { "" }
+	Report-Error "16a. Type '$tv' uses the export folder name '$headSeg' instead of a type$hint"
 }
 
 # --- Check 16: Reference type existence — типы вида CatalogRef.X должны разрешаться в объекты конфигурации ---

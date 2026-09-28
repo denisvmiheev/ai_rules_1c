@@ -1,8 +1,8 @@
 # v8std-local — tool catalog
 
-Read-only mirror of [v8std.ru](https://v8std.ru/) — ИТС "Стандарты и методики разработки конфигураций для платформы 1С:Предприятие 8". This fork's default server set does not run the upstream `1c-code-check-mcp` server (whose `its_help`/`fetch_its` were the original ITS-lookup path); `v8std-local` is the fork owner's replacement, and it goes further: every standard (`stdNNN`) is cross-linked to the analyzer diagnostics that enforce it (ACC/АПК, BSLLS, EDT native checks, v8-code-style), which `its_help`/`fetch_its` did not do.
+Read-only mirror of [v8std.ru](https://v8std.ru/) — ИТС "Стандарты и методики разработки конфигураций для платформы 1С:Предприятие 8". `v8std-local` is the ITS-lookup path of this ruleset, and it goes further than plain search: every standard (`stdNNN`) is cross-linked to the analyzer diagnostics that enforce it (ACC/АПК, BSLLS, EDT native checks, v8-code-style).
 
-> Load this file only if the `v8std-local` server is actually available in the current session. If a project still runs `1c-code-check-mcp`, `its_help` → `fetch_its` remains a valid alternate path for ITS lookups.
+> Load this file only if the `v8std-local` server is actually available in the current session.
 
 ## What it is and is not
 

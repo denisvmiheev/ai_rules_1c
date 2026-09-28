@@ -1,5 +1,11 @@
-﻿# form-compile v1.175 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.176 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
+# Local: from-object — a document choice form gets ChoiceMode like the catalog
+# one, the document item preset writes AutoTime=CurrentOrLast /
+# UsePostingMode=Auto / RepostOnWrite=true, and `Description` is bound only when
+# DescriptionLength > 0. windowOpeningMode / autoTime / usePostingMode accept only
+# the platform enum values, and a missing Configuration.xml is reported instead of
+# silently assuming 2.17. Same deltas as form-compile.py.
 param(
 	[string]$JsonPath,
 
@@ -206,7 +212,7 @@ function Load-Preset([string]$PresetName, [string]$ScriptDir) {
 			additional = @{ position = "page"; layout = "2col"; bspGroup = $true }
 			fieldDefaults = @{ ref = @{ choiceButton = $true }; boolean = @{ element = "check" } }
 			commandBar = "auto"
-			properties = @{ autoTitle = $false }
+			properties = @{ autoTitle = $false; autoTime = "CurrentOrLast"; usePostingMode = "Auto"; repostOnWrite = $true }
 		}
 		"document.list" = @{
 			columns = "all"; columnType = "labelField"; hiddenRef = $true
@@ -355,6 +361,9 @@ function Load-Preset([string]$PresetName, [string]$ScriptDir) {
 	return $defaults
 }
 
+# Document form posting properties, in the order the Configurator writes them.
+$script:documentPostingProperties = @('autoTime', 'usePostingMode', 'repostOnWrite')
+
 # --- Helper: build a field element DSL entry ---
 # Non-displayable types — cannot be bound to form elements
 $script:nonDisplayableTypes = @('v8:ValueStorage', 'ValueStorage', 'ХранилищеЗначения')
@@ -414,8 +423,10 @@ function Generate-CatalogFolderDSL($meta, [hashtable]$p) {
 	if ($meta.CodeLength -gt 0) {
 		$elements += [ordered]@{ input = "Код"; path = "Объект.Code" }
 	}
-	# Description
-	$elements += [ordered]@{ input = "Наименование"; path = "Объект.Description" }
+	# Description (if DescriptionLength > 0 — with 0 the standard attribute does not exist)
+	if ($meta.DescriptionLength -gt 0) {
+		$elements += [ordered]@{ input = "Наименование"; path = "Объект.Description" }
+	}
 	# Parent
 	$parentTitle = if ($p.parent -and $p.parent.title) { $p.parent.title } else { $null }
 	$parentEl = [ordered]@{ input = "Родитель"; path = "Объект.Parent" }
@@ -441,8 +452,10 @@ function Generate-CatalogFolderDSL($meta, [hashtable]$p) {
 function Generate-CatalogListDSL($meta, [hashtable]$p) {
 	# Columns
 	$columns = @()
-	# Description always first
-	$columns += [ordered]@{ labelField = "Наименование"; path = "Список.Description" }
+	# Description first (if DescriptionLength > 0)
+	if ($meta.DescriptionLength -gt 0) {
+		$columns += [ordered]@{ labelField = "Наименование"; path = "Список.Description" }
+	}
 	# Code if present
 	if ($meta.CodeLength -gt 0) {
 		$columns += [ordered]@{ labelField = "Код"; path = "Список.Code" }
@@ -516,8 +529,9 @@ function Generate-CatalogItemDSL($meta, [hashtable]$p, [hashtable]$fd) {
 	$cdLayout = if ($p.codeDescription -and $p.codeDescription.layout) { $p.codeDescription.layout } else { "horizontal" }
 	$cdOrder = if ($p.codeDescription -and $p.codeDescription.order) { $p.codeDescription.order } else { "descriptionFirst" }
 	$hasCode = ($meta.CodeLength -gt 0)
+	$hasDesc = ($meta.DescriptionLength -gt 0)
 
-	if ($cdLayout -eq "horizontal" -and $hasCode) {
+	if ($cdLayout -eq "horizontal" -and $hasCode -and $hasDesc) {
 		$cdChildren = @()
 		$descEl = [ordered]@{ input = "Наименование"; path = "Объект.Description" }
 		$codeEl = [ordered]@{ input = "Код"; path = "Объект.Code" }
@@ -531,8 +545,10 @@ function Generate-CatalogItemDSL($meta, [hashtable]$p, [hashtable]$fd) {
 			representation = "none"; children = $cdChildren
 		}
 	} else {
-		# Vertical or no code
-		$headerChildren += [ordered]@{ input = "Наименование"; path = "Объект.Description" }
+		# Vertical, or only one of the two standard fields exists
+		if ($hasDesc) {
+			$headerChildren += [ordered]@{ input = "Наименование"; path = "Объект.Description" }
+		}
 		if ($hasCode) {
 			$headerChildren += [ordered]@{ input = "Код"; path = "Объект.Code" }
 		}
@@ -696,6 +712,9 @@ function Generate-DocumentChoiceDSL($meta, [hashtable]$p, [hashtable]$presetData
 
 	$dsl.properties["windowOpeningMode"] = "LockOwnerWindow"
 	if ($p.properties) { foreach ($k in $p.properties.Keys) { $dsl.properties[$k] = $p.properties[$k] } }
+
+	# Set ChoiceMode on table (the document list DSL has exactly one root element, the table)
+	$dsl.elements[0]["choiceMode"] = $true
 
 	return $dsl
 }
@@ -903,9 +922,18 @@ function Generate-DocumentItemDSL($meta, [hashtable]$p, [hashtable]$fd) {
 		}
 	}
 
-	# Properties
+	# Properties. The posting properties go last and in Configurator order
+	# (AutoTime, UsePostingMode, RepostOnWrite): preset sections are hashtables,
+	# so their key order is not the order the platform writes.
 	$formProps = [ordered]@{ autoTitle = $false }
-	if ($p.properties) { foreach ($k in $p.properties.Keys) { $formProps[$k] = $p.properties[$k] } }
+	if ($p.properties) {
+		foreach ($k in $p.properties.Keys) {
+			if ($script:documentPostingProperties -notcontains $k) { $formProps[$k] = $p.properties[$k] }
+		}
+		foreach ($k in $script:documentPostingProperties) {
+			if ($p.properties.ContainsKey($k)) { $formProps[$k] = $p.properties[$k] }
+		}
+	}
 
 	return [ordered]@{
 		title = $meta.Synonym
@@ -1344,6 +1372,9 @@ function Detect-FormatVersion([string]$dir) {
 		if ($parent -eq $d) { break }
 		$d = $parent
 	}
+	# Local: say so instead of guessing silently — a Form.xml whose version differs
+	# from Configuration.xml is refused on load.
+	Write-Host "[WARN] Configuration.xml not found above the output path — Form.xml version 2.17 assumed; check it against the target configuration"
 	return "2.17"
 }
 
@@ -2627,7 +2658,9 @@ $script:eventSuffixMap = @{
 	"BeforeDeleteRow"      = "ПередУдалением"
 	"BeforeRowChange"      = "ПередНачаломИзменения"
 	"OnStartEdit"          = "ПриНачалеРедактирования"
-	"OnEndEdit"            = "ПриОкончанииРедактирования"
+	# Local: the platform event is OnEditEnd — upstream spells the key OnEndEdit,
+	# so every OnEditEnd handler fell through to the literal fallback name.
+	"OnEditEnd"            = "ПриОкончанииРедактирования"
 	"Selection"            = "ВыборСтроки"
 	"OnCurrentPageChange"  = "ПриСменеСтраницы"
 	"TextEditEnd"          = "ОкончаниеВводаТекста"
@@ -2676,34 +2709,87 @@ $script:knownEvents = @{
 $script:knownFormEvents = @("OnCreateAtServer","OnOpen","BeforeClose","OnClose","NotificationProcessing","ChoiceProcessing","OnReadAtServer","AfterWriteAtServer","BeforeWriteAtServer","AfterWrite","BeforeWrite","OnWriteAtServer","FillCheckProcessingAtServer","OnLoadDataFromSettingsAtServer","BeforeLoadDataFromSettingsAtServer","OnSaveDataInSettingsAtServer","ExternalEvent","OnReopen","Opening")
 
 # Собрать упорядоченный список событий элемента (имя, обработчик) из DSL.
-# Основной формат: $el.events = { Событие: ИмяОбработчика } (null/"" → авто-имя по конвенции).
-# Legacy (принимается ради совместимости): $el.on (массив) + $el.handlers (переопределение имён).
+#
+# Один нормализатор на все три формы записи — и эмиттер, и Test-ElementEvent
+# смотрят ровно на его результат, поэтому «событие подключено» и «событие попало
+# в XML» не могут разойтись:
+#
+#   * канонический     $el.events   = { Событие: ИмяОбработчика|null }
+#   * legacy-пара      $el.on       = [ Событие, ... ] + $el.handlers = { Событие: Имя }
+#   * legacy-одиночный $el.handlers = { Событие: Имя }   (без $el.on)
+#
+# null / "" в качестве имени — авто-имя по конвенции (Get-HandlerName).
+#
+# Local: upstream принимал только первые две формы, причём `handlers` без `on`
+# молча терялся — компиляция была успешной, а события в форме не было. Ровно то
+# же молчание было при одновременном указании `events` и legacy-ключей: один из
+# форматов игнорировался без диагностики. Здесь оба случая — явный отказ до
+# записи XML, потому что «успешно скомпилировано без обработчика» обнаруживается
+# только в Конфигураторе.
+function Deny-EventConflict {
+	param([string]$elementName, [string]$message, [string]$fix)
+	# Console.Error + exit (not Write-Error): under ErrorActionPreference=Stop the
+	# latter throws, and the thrown record decides the exit code instead of us.
+	[Console]::Error.WriteLine("[ERROR] Конфликт описания событий у элемента '$elementName': $message")
+	[Console]::Error.WriteLine("        $fix")
+	exit 1
+}
+
 function Get-EventPairs {
 	param($el, [string]$elementName)
 	$pairs = New-Object System.Collections.ArrayList
-	if ($el.events) {
+	$hasEvents = [bool]$el.events
+	$hasOn = [bool]$el.on
+	$hasHandlers = [bool]$el.handlers
+
+	if ($hasEvents -and ($hasOn -or $hasHandlers)) {
+		$legacy = @()
+		if ($hasOn) { $legacy += 'on' }
+		if ($hasHandlers) { $legacy += 'handlers' }
+		Deny-EventConflict $elementName "одновременно заданы канонический ключ 'events' и legacy-ключ(и) '$($legacy -join "' и '")'." "Оставьте один формат: либо 'events': {Событие: ИмяОбработчика}, либо 'on' + 'handlers'."
+	}
+
+	# Нормализованный источник: упорядоченный список пар (событие, заданное имя|null).
+	$source = New-Object System.Collections.ArrayList
+	if ($hasEvents) {
 		foreach ($p in $el.events.PSObject.Properties) {
-			$h = "$($p.Value)"
-			if ([string]::IsNullOrEmpty($h)) { $h = Get-HandlerName -elementName $elementName -eventName $p.Name }
-			[void]$pairs.Add([pscustomobject]@{ name = $p.Name; handler = $h })
+			[void]$source.Add([pscustomobject]@{ name = "$($p.Name)"; value = $p.Value })
 		}
-	} elseif ($el.on) {
-		foreach ($evt in $el.on) {
-			$evtName = "$evt"
-			$h = if ($el.handlers -and $el.handlers.$evtName) { "$($el.handlers.$evtName)" } else { Get-HandlerName -elementName $elementName -eventName $evtName }
-			[void]$pairs.Add([pscustomobject]@{ name = $evtName; handler = $h })
+	} elseif ($hasOn) {
+		$onNames = @($el.on | ForEach-Object { "$_" })
+		if ($hasHandlers) {
+			$unknown = @($el.handlers.PSObject.Properties | Where-Object { $onNames -notcontains "$($_.Name)" } | ForEach-Object { "$($_.Name)" })
+			if ($unknown.Count -gt 0) {
+				Deny-EventConflict $elementName "'handlers' переопределяет события, которых нет в 'on': $($unknown -join ', ')." "Добавьте их в 'on' или уберите из 'handlers' — молча отбросить их нельзя, это и есть опечатка, из-за которой обработчик не попадает в форму."
+			}
 		}
+		foreach ($evtName in $onNames) {
+			$given = if ($hasHandlers) { $el.handlers.$evtName } else { $null }
+			[void]$source.Add([pscustomobject]@{ name = $evtName; value = $given })
+		}
+	} elseif ($hasHandlers) {
+		# Legacy-одиночный handlers: тот же смысл, что events.
+		foreach ($p in $el.handlers.PSObject.Properties) {
+			[void]$source.Add([pscustomobject]@{ name = "$($p.Name)"; value = $p.Value })
+		}
+	}
+
+	foreach ($item in $source) {
+		$h = "$($item.value)"
+		if ([string]::IsNullOrEmpty($h)) { $h = Get-HandlerName -elementName $elementName -eventName $item.name }
+		[void]$pairs.Add([pscustomobject]@{ name = $item.name; handler = $h })
 	}
 	return $pairs
 }
 
 # Проверить, подключено ли событие к элементу (в любом из форматов).
+# Namesake of the Python test_element_event: same normalization, so a format the
+# emitter understands can never be invisible here (or the other way round).
 function Test-ElementEvent {
 	param($el, [string]$eventName)
-	if ($el.events) {
-		foreach ($p in $el.events.PSObject.Properties) { if ($p.Name -eq $eventName) { return $true } }
+	foreach ($pr in (Get-EventPairs -el $el -elementName "$($el.name)")) {
+		if ($pr.name -eq $eventName) { return $true }
 	}
-	if ($el.on -contains $eventName) { return $true }
 	return $false
 }
 
@@ -2713,12 +2799,16 @@ function Emit-Events {
 	$pairs = Get-EventPairs -el $el -elementName $elementName
 	if ($pairs.Count -eq 0) { return }
 
-	# Validate event names
+	# Validate event names.
+	# Local: upstream printed a [WARN] and compiled anyway, so a misspelled event
+	# (`OnEndEdit` for `OnEditEnd`, say) ended up in Form.xml as a platform event
+	# that does not exist — visible only when the Configurator loads the form.
 	if ($typeKey -and $script:knownEvents.ContainsKey($typeKey)) {
 		$allowed = $script:knownEvents[$typeKey]
 		foreach ($pr in $pairs) {
 			if ($allowed.Count -gt 0 -and $allowed -notcontains "$($pr.name)") {
-				Write-Host "[WARN] Unknown event '$($pr.name)' for $typeKey '$elementName'. Known: $($allowed -join ', ')"
+				[Console]::Error.WriteLine("[ERROR] Неизвестное событие '$($pr.name)' для $typeKey '$elementName'. Известные: $($allowed -join ', ')")
+				exit 1
 			}
 		}
 	}
@@ -6233,6 +6323,16 @@ function Emit-CommandInterface {
 
 # --- 11. Properties emitter ---
 
+# Local: closed value sets of the platform enums behind these form properties
+# (FormWindowOpeningMode, AutoTimeMode, PostingModeUse). Upstream accepted any
+# string, and its spec listed values that do not exist (Modeless, Current,
+# Postings, Movements) — the Configurator refuses such a Form.xml on load.
+$script:formPropertyValues = @{
+	"windowOpeningMode" = @("Independent", "LockOwnerWindow", "LockWholeInterface")
+	"autoTime"          = @("DontUse", "First", "Last", "CurrentOrFirst", "CurrentOrLast")
+	"usePostingMode"    = @("Auto", "RealTime", "Regular")
+}
+
 function Emit-Properties {
 	param($props, [string]$indent)
 
@@ -6273,6 +6373,10 @@ function Emit-Properties {
 		$val = $p.Value
 		# Пустая строка = суппресс-маркер (напр. autoTitle:"" — не эмитить и не додумывать)
 		if ($val -is [string] -and $val -eq '') { continue }
+		if ($script:formPropertyValues.ContainsKey($p.Name) -and $script:formPropertyValues[$p.Name] -cnotcontains [string]$val) {
+			[Console]::Error.WriteLine("[ERROR] Недопустимое значение свойства формы '$($p.Name)': '$val'. Допустимые: $($script:formPropertyValues[$p.Name] -join ', ')")
+			exit 1
+		}
 		if ($val -is [bool]) {
 			$val = if ($val) { "true" } else { "false" }
 		}
@@ -6610,9 +6714,11 @@ if ($acbHasInner) {
 
 # 12e. Events
 if ($def.events) {
+	# Local: a refusal, not a [WARN] — same reason as the element events above.
 	foreach ($p in $def.events.PSObject.Properties) {
 		if ($script:knownFormEvents -notcontains $p.Name) {
-			Write-Host "[WARN] Unknown form event '$($p.Name)'. Known: $($script:knownFormEvents -join ', ')"
+			[Console]::Error.WriteLine("[ERROR] Неизвестное событие формы '$($p.Name)'. Известные: $($script:knownFormEvents -join ', ')")
+			exit 1
 		}
 	}
 	X "`t<Events>"
@@ -6712,14 +6818,11 @@ if ($formsLeaf -eq 'Forms') {
 				}
 
 				$regEnc = New-Object System.Text.UTF8Encoding($true)
-				$regSettings = New-Object System.Xml.XmlWriterSettings
-				$regSettings.Encoding = $regEnc
-				$regSettings.Indent = $false
-				$regStream = New-Object System.IO.FileStream($objectXmlPath, [System.IO.FileMode]::Create)
-				$regWriter = [System.Xml.XmlWriter]::Create($regStream, $regSettings)
-				$objDoc.Save($regWriter)
-				$regWriter.Close()
-				$regStream.Close()
+				$xmlText = $objDoc.OuterXml
+				$xmlText = [regex]::Replace($xmlText, '(?s)<!\[CDATA\[.*?\]\]>|<!--.*?-->|<\?.*?\?>|(?<=\S) />', { param($m) if ($m.Value -eq ' />') { '/>' } else { $m.Value } })
+				$targetEol = if ([System.IO.File]::ReadAllText($objectXmlPath) -match "`r`n") { "`r`n" } else { "`n" }
+				$xmlText = ($xmlText -replace "`r`n", "`n") -replace "`n", $targetEol
+				[System.IO.File]::WriteAllText($objectXmlPath, $xmlText, $regEnc)
 
 				Write-Host "     Registered: <Form>$formName</Form> in $objectName.xml"
 			}

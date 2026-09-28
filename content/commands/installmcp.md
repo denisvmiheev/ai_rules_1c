@@ -1,5 +1,6 @@
 ---
 description: Download the 1C MCP server distribution from vibecoding1c.ru and install all servers from it, in the stable or the beta image channel
+userOnly: true
 argumentHint: "[stable|beta]"
 ---
 
@@ -26,7 +27,7 @@ MCP_Distr/
     └── .env                            ← Graph parameters (filled from config.env)
 ```
 
-Use `/checkmcp` to inspect already installed servers. Use `/updatemcp` to update an already installed set (and to re-fetch a newer distribution + new license keys).
+Use `/setupmcp` (`content/commands/setupmcp.md`) to connect already installed servers and available memory to a new repository by their actual addresses. Use `/checkmcp` to inspect those connections. Use `/updatemcp` to update an already installed set (and to re-fetch a newer distribution + new license keys).
 
 ## Release channel — stable or beta (`IMAGE_TAG`)
 
@@ -60,7 +61,7 @@ If the user declines — fall back to `stable` and say so in one line.
 
 ### Which tags actually exist
 
-Verified on Docker Hub on **2026-08-22**; treat as a snapshot, not as a contract — always verify before pulling:
+Verified on Docker Hub on **2026-08-24**; treat as a snapshot, not as a contract — always verify before pulling:
 
 | Image | Stable tags | Beta tags |
 |---|---|---|
@@ -70,9 +71,9 @@ Verified on Docker Hub on **2026-08-22**; treat as a snapshot, not as a contract
 | `comol/mcp_ssl_server` | `latest`, `light`, `arm64` | `latest-beta`, `light-beta`, `arm64-beta` |
 | `comol/template-search-mcp` | `latest`, `light`, `arm64` | `latest-beta`, `light-beta`, `arm64-beta` |
 | `comol/1c-code-checker` | `latest`, `arm64` | `latest-beta`, `light-beta`, `arm64-beta` |
-| `comol/1c_syntaxcheck_mcp` | `latest` | `latest-beta` |
+| `comol/1c_syntaxcheck_mcp` | `latest` | `latest-beta`, `arm64-beta` |
 
-So `latest` / `latest-beta` exists everywhere, and the `light` / `arm64` variants do not. **Image names come from `<TARGET>\servers\NN_*.md`, not from this table** — the table only says which tags that image publishes. When a per-server file pins the tag literally (`comol/1c_help_mcp:latest`), substitute **only the tag part** with `IMAGE_TAG` and leave the repository name exactly as the distribution wrote it.
+`latest` / `latest-beta` exists everywhere, while optional `light` / `arm64` variants differ by image. Syntax has no `light*` or stable `arm64`, but does publish native `arm64-beta`. **Image names come from `<TARGET>\servers\NN_*.md`, not from this table** — the table only says which tags that image publishes. When a per-server file pins the tag literally (`comol/1c_help_mcp:latest`), substitute **only the tag part** with `IMAGE_TAG` and leave the repository name exactly as the distribution wrote it.
 
 ### Verify the tag before pulling
 
@@ -115,7 +116,9 @@ If the target directory already exists and already contains `INSTALL.md`, **stop
 
 Otherwise proceed to download.
 
-#### 1.1. Download the archive — fully headless HTTP flow
+#### 1.1. Distribution download flow (canon)
+
+**This section is the canon for the download flow** — Tilda login → getpage → Yandex Disk public link → download → unpack, with the browser / manual fallback and the credentials policy. `/updatemcp` points here instead of repeating it; its two differences (a staging directory, a change check before the download) live there.
 
 The download URL is **not hardcoded** — it is published on `https://vibecoding1c.ru/mcpserver` behind a "Скачать" button (Yandex Disk) and rotates between releases. The page is a Tilda **members-only area**: a plain GET returns only the ~850-byte Tilda stub HTML (`<div id="allrecords" data-tilda-project-id="..." data-tilda-page-id="...">`); the actual content is fetched by Tilda's JS via two API calls. We replicate those two calls directly from PowerShell — no browser needed.
 
@@ -305,7 +308,7 @@ Either way the resolved tag is written to `IMAGE_TAG` in Step 5 — not pasted i
    - Install Docker Desktop: `winget install Docker.DockerDesktop`.
    - Ask the user to start Docker Desktop and wait for it to be ready.
    - Re-run `docker info`.
-2. **Detailed mode only — embedding model choice.** Briefly explain three options (LM Studio + Qwen with NVIDIA GPU / OpenRouter API / CPU mode) and reference `https://docs.onerpa.ru/mcp-servery-1c/embedding-modeli`. For users in Russia, note that `huggingface.co` may be blocked — recommend LM Studio or OpenRouter.
+2. **Detailed mode only — embedding model choice.** The shipped default is RouterAI with `EMBEDDING_MODEL=qwen/qwen3-embedding-8b`; keep it unless the user deliberately picks something else. Briefly explain the alternatives (LM Studio + Qwen3 Embedding with NVIDIA GPU / OpenRouter or OpenAI API / CPU mode) and reference `https://docs.onerpa.ru/mcp-servery-1c/embedding-modeli`. For users in Russia, note that `huggingface.co` may be blocked — recommend RouterAI or LM Studio.
 
 ### 5. Fill in `config.env`
 
@@ -313,13 +316,14 @@ Open `<TARGET>\config.env`. **Do not** invent values. For every parameter that i
 
 | Parameter | Ask when | Prompt to the user |
 |---|---|---|
-| `EMBEDDING_API_KEY` | empty | Нужен ключ OpenRouter (или OpenAI) для embedding-моделей. Используется большинством серверов для семантического поиска. Регистрация: https://openrouter.ai/ |
+| `EMBEDDING_API_KEY` | empty | Нужен ключ RouterAI (или OpenRouter / OpenAI) для embedding-моделей. Используется большинством серверов для семантического поиска. Регистрация: https://routerai.ru/ |
+| `EMBEDDING_MODEL` | **never ask** | Default is `qwen/qwen3-embedding-8b` with `EMBEDDING_API_BASE=https://routerai.ru/api/v1`. Write that pair if either key is missing or empty in `config.env`; keep a value the user already set. Only replace it when the user explicitly chose another provider, and then use that provider's model name from `INSTALL.md`. |
 | `PATH_1C_BIN` | empty | Путь к папке `bin` платформы 1С, например `C:\Program Files (x86)\1cv8\8.3.27.1936\bin`. |
-| `PATH_METADATA` | empty | Путь к текстовому отчёту по конфигурации (Конфигуратор → Конфигурация → Отчёт по конфигурации). Если нет — серверы `CodeMetadata` и `Graph` будут пропущены. |
-| `PATH_CODE` | empty | Путь к выгрузке конфигурации в файлы (или каталог EDT). Если нет — `CodeMetadata` и `Graph` будут пропущены. |
+| `PATH_METADATA` | empty | Необязательный путь к текстовому отчёту по конфигурации. Для beta он нужен только в legacy-режиме `METADATA_SOURCE=report` и для Graph + EDT; Designer XML работает без отчёта. |
+| `PATH_CODE` | empty | Путь к Designer XML-выгрузке или каталогу EDT. Для новых beta-контрактов это основной источник CodeMetadata и Graph. |
 | `PATH_BASES` | empty | Каталог для баз серверов, например `E:\bases\mcp`. Внутри будут созданы подкаталоги. |
 | `ONEC_AI_TOKEN` | empty | Токен 1С:Напарник. Если нет — сервер `1CCodeChecker` будет пропущен. |
-| `CHAT_API_KEY` | empty | Если `EMBEDDING_API_KEY` уже введён и провайдер тот же (OpenRouter) — **используй тот же ключ автоматически**, не спрашивай. Иначе спроси отдельно. |
+| `CHAT_API_KEY` | empty | Если `EMBEDDING_API_KEY` уже введён и провайдер тот же (по умолчанию RouterAI) — **используй тот же ключ автоматически**, не спрашивай. Иначе спроси отдельно. |
 | `IMAGE_TAG` | **never ask** | Not a free-form value: write the tag resolved in `## Release channel` (`latest` / `latest-beta` / `light` / `light-beta` / `arm64` / `arm64-beta`). Add the key if the archive's `config.env` lacks it; overwrite an archive default that contradicts the resolved channel. |
 
 If the user says a parameter is unavailable (no metadata dump, no token, etc.) — mark the dependent servers as **skipped** and explicitly tell the user which ones and why. In simple mode install **all** servers that have all required data; in detailed mode also ask which optional servers to install and discuss `USE_GPU` and `SSL_VERSION` per `INSTALL.md` (`IMAGE_TAG` is already settled by `## Release channel` — do not re-open it here).
@@ -333,12 +337,14 @@ Servers are listed in order of importance per `INSTALL.md`. For each server in t
 | # | Server | Per-server file | Container | Port | Required inputs |
 |---|--------|-----------------|-----------|------|-----------------|
 | 1 | HelpSearchServer        | `servers/01_HelpSearchServer.md`        | `1c_help_mcp`              | 8003 | `LICENSE_KEY_HELP`, `PATH_1C_BIN` |
-| 2 | GraphMetadataSearch     | `servers/02_GraphMetadataSearch.md`     | Compose stack + Neo4j      | 8006 | `PATH_METADATA`, `EMBEDDING_API_KEY` |
-| 3 | CodeMetadataSearchServer| `servers/03_CodeMetadataSearchServer.md`| `1c_code_metadata_mcp`     | 8000 | `PATH_METADATA`, `PATH_CODE` |
+| 2 | GraphMetadataSearch     | `servers/02_GraphMetadataSearch.md`     | Compose stack + Neo4j      | 8006 | beta Designer XML: `PATH_CODE`; EDT: ещё `PATH_METADATA`; embedding key для light |
+| 3 | CodeMetadataSearchServer| `servers/03_CodeMetadataSearchServer.md`| `1c_code_metadata_mcp`     | 8000 | beta: `PATH_CODE`; stable/legacy report mode: ещё `PATH_METADATA` |
 | 4 | SSLSearchServer         | `servers/04_SSLSearchServer.md`         | `1c_ssl_mcp`               | 8008 | `SSL_VERSION` |
 | 5 | TemplatesSearchServer   | `servers/05_TemplatesSearchServer.md`   | `1c_templates_mcp`         | 8004 | — |
-| 6 | SyntaxCheckServer       | `servers/06_SyntaxCheckServer.md`       | `1c_syntax_checker_mcp`    | 8002 | — |
+| 6 | SyntaxCheckServer       | `servers/06_SyntaxCheckServer.md`       | `1c_syntax_checker_mcp`    | 8002 | — (optional sources mount, see below) |
 | 7 | 1CCodeChecker           | `servers/07_1CCodeChecker.md`           | `1c_code_checker_mcp`      | 8007 | `ONEC_AI_TOKEN` |
+
+**SyntaxCheckServer, two optional switches (canon — `/checkmcp` points here).** Mounting the project sources read-only and setting `FILES_DIR` registers the `syntaxcheck_file` tool — the default form of the syntax gate, because a check by path costs a path instead of the whole module body; without the mount only `syntaxcheck` (code as text) exists. The second switch is **optional** and beta-only: `FULLINDEX=true` plus an index volume (`/index`, `INDEX_DIR` moves it) makes the container index those sources and additionally answer `UnresolvedMethodCall`, `UnresolvedField` and `QueryToMissingMetadata`, which are off in every other state. Indexing a real configuration runs for hours — the container answers calls the whole time, and the volume keeps the index across restarts — and a file check with the index costs seconds instead of milliseconds. A server without it is a normal, fully working install, so offer it as a capability the operator may want, never as a fix; and never switch the channel to beta just to obtain it.
 
 For every server:
 
@@ -354,7 +360,9 @@ Skip servers whose required inputs are missing and explicitly list them in the f
 
 **Volume warning.** Always pass `-v "<PATH_BASES>/<subdir>:/app/..."` exactly as written in the per-server file. Initial indexing of RAG servers (`1C-docs-mcp`, `1c-code-metadata-mcp`, `1c-graph-metadata-mcp`, `1c-ssl-mcp`) can take many hours up to a day; without volumes the indexes are lost on restart.
 
-### 7. Register servers in the active tool
+### 7. Per-client MCP config — register servers in the active tool
+
+**This section is the canon for the per-client MCP config placement** — file path, top-level key, per-server shape, the Kilo legacy-file warning and the OpenCode `onec-` key rule. `/updatemcp`, `/checkmcp`, `/doctor` and the optional-tool installers point here; `install.ps1` renders the same placement.
 
 After containers are up, write the MCP config for the active client. **The file path and JSON shape differ per client** — using the wrong combination (most commonly: writing Cursor-style `mcpServers` into a Kilo / OpenCode file) results in a silently empty MCP list in `/mcps` and missing tools in the agent session. The canonical fragment from `INSTALL.md` STEP 4 covers Cursor only; for the other clients use the table below.
 
@@ -368,8 +376,12 @@ After containers are up, write the MCP config for the active client. **The file 
 | Codex CLI | `.codex/config.toml` (project) or `~/.codex/config.toml` (global) | `[mcp_servers."<id>"]` | TOML keys `url = ...`, `connection_id = ...` |
 | Qwen Code | `.qwen/settings.json` (project) or `~/.qwen/settings.json` (user) | `mcpServers` | HTTP: `{ "httpUrl": "..." }`; SSE: `{ "url": "..." }`; stdio: `{ "command", "args?" }` |
 | Kimi Code CLI | `.kimi-code/mcp.json` (project) | `mcpServers` | `{ "url": "..." }` |
+| ZCode | `.zcode/config.json` (project) | `mcp.servers` | HTTP `{ "type": "http", "url": "...", "headers"?: {} }`; stdio `{ "type": "stdio", "command": "...", "args"?: [], "env"?: {} }` |
+| MiMo Code | `mimocode.json` (project; `mimocode.jsonc` overrides it) | `mcp` | HTTP `{ "type": "remote", "url": "...", "enabled": true }`; stdio `{ "type": "local", "command": ["..."], "environment"?: {}, "enabled": true }` |
 | Cline | `~/.cline/mcp.json` or `~/.cline/data/settings/cline_mcp_settings.json` (**global only** — no project MCP file) | `mcpServers` | `{ "url": "..." }` or stdio `{ "command", "args?" }` |
 | Pi | — | — | No built-in MCP; use a Pi extension if needed |
+
+ZCode and MiMo Code use strict native schemas: omit catalog-only `connection_id` and `description`. Preserve other settings and user-owned MCP entries; the adapters' `mergeServers` / `managedServers` contract is defined in `AGENT-INSTALL.md`. ZCode's `.agents/mcp.json` fallback is ignored when native servers exist, so write to `.zcode/config.json`. Sources: [ZCode MCP](https://zcode.z.ai/en/docs/mcp-services), [MiMo MCP](https://mimo.xiaomi.com/mimocode/mcp-servers), [MiMo config precedence](https://mimo.xiaomi.com/mimocode/config-overrides).
 
 Canonical fragments (Cursor / Claude Code — `mcpServers`):
 
@@ -380,7 +392,7 @@ Canonical fragments (Cursor / Claude Code — `mcpServers`):
     "1c-graph-metadata-mcp":{ "url": "http://localhost:8006/mcp", "connection_id": "1c_graph_metadata_001" },
     "1c-code-metadata-mcp": { "url": "http://localhost:8000/mcp", "connection_id": "1c_metadata_service_001" },
     "1c-ssl-mcp":           { "url": "http://localhost:8008/mcp", "connection_id": "1c_ssl_service_001" },
-    "1c-templates-mcp":     { "url": "http://localhost:8004/mcp", "connection_id": "1c_templates_service_001" },
+    "1c-templates-fastcode":     { "url": "http://localhost:8004/mcp", "connection_id": "1c_templates_service_001", "headers": { "Authorization": "Bearer <value from MCP_OPERATOR_TOKEN>" } },
     "1c-syntax-checker-mcp":{ "url": "http://localhost:8002/mcp", "connection_id": "1c_lsp_service_001" },
     "1c-code-checker-mcp":  { "url": "http://localhost:8007/mcp", "connection_id": "1c_code_checker_001" }
   }
@@ -396,7 +408,7 @@ Kilo Code (`mcp` key, per-server `type` + `enabled`, see https://kilo.ai/docs/au
     "1c-graph-metadata-mcp": { "type": "remote", "url": "http://localhost:8006/mcp", "enabled": true },
     "1c-code-metadata-mcp":  { "type": "remote", "url": "http://localhost:8000/mcp", "enabled": true },
     "1c-ssl-mcp":            { "type": "remote", "url": "http://localhost:8008/mcp", "enabled": true },
-    "1c-templates-mcp":      { "type": "remote", "url": "http://localhost:8004/mcp", "enabled": true },
+    "1c-templates-fastcode":      { "type": "remote", "url": "http://localhost:8004/mcp", "headers": { "Authorization": "Bearer <value from MCP_OPERATOR_TOKEN>" }, "enabled": true },
     "1c-syntax-checker-mcp": { "type": "remote", "url": "http://localhost:8002/mcp", "enabled": true },
     "1c-code-checker-mcp":   { "type": "remote", "url": "http://localhost:8007/mcp", "enabled": true }
   }
@@ -414,7 +426,7 @@ OpenCode (`mcp` key) — **the server key MUST start with a letter**. OpenCode n
     "onec-graph-metadata-mcp": { "type": "remote", "url": "http://localhost:8006/mcp" },
     "onec-code-metadata-mcp":  { "type": "remote", "url": "http://localhost:8000/mcp" },
     "onec-ssl-mcp":            { "type": "remote", "url": "http://localhost:8008/mcp" },
-    "onec-templates-mcp":      { "type": "remote", "url": "http://localhost:8004/mcp" },
+    "onec-templates-mcp":      { "type": "remote", "url": "http://localhost:8004/mcp", "headers": { "Authorization": "Bearer <value from MCP_OPERATOR_TOKEN>" } },
     "onec-syntax-checker-mcp": { "type": "remote", "url": "http://localhost:8002/mcp" },
     "onec-code-check-mcp":     { "type": "remote", "url": "http://localhost:8007/mcp" }
   }
@@ -430,14 +442,14 @@ Qwen Code (merge only `mcpServers` into `.qwen/settings.json`; HTTP uses `httpUr
     "1c-graph-metadata-mcp": { "httpUrl": "http://localhost:8006/mcp" },
     "1c-code-metadata-mcp": { "httpUrl": "http://localhost:8000/mcp" },
     "1c-ssl-mcp":            { "httpUrl": "http://localhost:8008/mcp" },
-    "1c-templates-mcp":      { "httpUrl": "http://localhost:8004/mcp" },
+    "1c-templates-fastcode":      { "httpUrl": "http://localhost:8004/mcp", "headers": { "Authorization": "Bearer <value from MCP_OPERATOR_TOKEN>" } },
     "1c-syntax-checker-mcp": { "httpUrl": "http://localhost:8002/mcp" },
     "1c-code-check-mcp":     { "httpUrl": "http://localhost:8007/mcp" }
   }
 }
 ```
 
-Keep only the servers that were actually installed. If the project has `.ai-rules.json`, the MCP config is rendered by the 1c-rules installer (which already implements the per-client table above and deep-merges Kilo's `mcp` / Qwen's `mcpServers` keys) — re-render through `/updaterules` instead of editing the file manually. Ask the user to restart the client so the MCP session is reinitialized. For Cline, configure MCP once in the global Cline settings (the rules installer does not write a project MCP file).
+Keep only the servers that were actually installed. Replace the Templates placeholder from `<TARGET>\config.env`; never print the token in chat or commit the rendered client config. If write tools are disabled, omit that header and expect `remember` / `add_template` / `plugin_reload` to be absent. If the project has `.ai-rules.json`, the MCP config is rendered by the 1c-rules installer (which implements the per-client table and deep-merges Kilo's `mcp` / Qwen's `mcpServers` keys); provide `MCP_OPERATOR_TOKEN` in the installer process environment if authenticated Templates mutations are required, then re-render through `/updaterules`. Ask the user to restart the client so the MCP session is reinitialized. For Cline, configure MCP once in the global Cline settings (the rules installer does not write a project MCP file).
 
 ### 8. Final check
 
@@ -460,7 +472,7 @@ Short user summary:
 
 - The command **does not invent** installation steps that are not in `<TARGET>\INSTALL.md` and `<TARGET>\servers\*.md`. If the bundled instruction lacks something, ask the user instead of filling gaps from memory.
 - The command **does not echo or persist license keys / API tokens** in chat, in the repo, or in any committed file. Keys live only in `<TARGET>\config.env` and in container environment variables.
-- The command **may** store Tilda member-area credentials (`tilda_login`, `tilda_password`) in `memory.md`, but **only** after explicit user consent on the run that introduced them. Treat the credentials as low-sensitivity per the user's own statement — scope is access to a public distribution link, not payment / billing. Credentials are re-used by every `/installmcp` / `/updatemcp` run (the Tilda session token is short-lived and obtained fresh each time, not cached).
+- The command **may** store Tilda member-area credentials (`tilda_login`, `tilda_password`) in `memory.md`, but **only** after explicit user consent on the run that introduced them (canon for the credentials policy — `/updatemcp` points here). Treat the credentials as low-sensitivity per the user's own statement — scope is access to a public distribution link, not payment / billing. Credentials are re-used by every `/installmcp` / `/updatemcp` run (the Tilda session token is short-lived and obtained fresh each time, not cached).
 - The command **does not run** `docker run` / `docker compose up` / `docker pull` without explicit user confirmation; images may be several GB.
 - The command **does not install the beta channel** unless the user asked for it by argument or answer, and confirmed the beta prompt. Stable is the default in every ambiguous case, and a mixed stable/beta set is only ever the result of an explicit, reported decision.
 - The graph server (`1c-graph-metadata-mcp`) requires Neo4j and the Compose stack from `<TARGET>\Graph_metadata_search\`. Execute it strictly by `servers/02_GraphMetadataSearch.md`, not by generic recipes from `/checkmcp`.

@@ -1,18 +1,25 @@
 # 1c-templates-fastcode — tool catalog
 
-Code template library (`templatesearch`) and project vector memory (`remember` / `recall`). Memory routing rules live in `AGENTS.md → Project memory`.
+Code template library (`templatesearch`) and project vector memory (`remember` / `recall`), both governed by `TOOL_TEMPLATES`. Memory search scope and write fallback follow `content/rules/project-memory.md`; do not expand quick-fix to all providers or bypass a required provider failure. Tool mappings: `content/skills/mcp-1c-tools/docs/memory-providers.md`.
 
-> Load this file only if the `1c-templates-fastcode` server is actually available in the current session.
+> Load this file only if `1c-templates-fastcode` is actually available in the current session. The expanded catalogue below is published in beta; stable tags expose an older surface. `tools/list` is authoritative.
 
 | Tool | Parameters | Purpose | When to use |
 |---|---|---|---|
 | **templatesearch** | `query` | Hybrid search (semantic + fulltext) over the code-template library (2000+ entries) of ready-made solution patterns | Find architectural patterns and implementation examples **before** writing code; pass `query` per *Query formulation (`templatesearch`) only* below |
-| **remember** | `content` (≥ 5 chars) | Save a free-form note to project memory (vector-indexed) | Persist a project-specific fact, user correction, standing working condition, or non-obvious decision that should survive across tasks |
+| **list_templates** | `limit=50`, `offset=0` | Bounded catalogue page without source code; follow `next_offset` until `null` | Browse the library without an unbounded payload |
+| **get_template** | `template_id` | Full template body by ID | Fetch code for a catalogue/search hit |
 | **recall** | `query` | Vector search over saved notes | At the start of any non-trivial task — recall earlier corrections, decisions, and project-specific quirks |
+| **plugin_state** | none | Plugin hooks/tables, errors and derived-index fingerprint | Diagnose extensions without mutating the server |
+| **add_template** | `description`, `code` (both ≥ 10 chars) | Persist and index a template | Conditional mutation; only on an explicit request |
+| **remember** | `content` (≥ 5 chars) | Save a free-form note to project memory (vector-indexed) | Always registered; persist a durable project fact without an operator token |
+| **plugin_reload** | none | Atomically reload plugins | Conditional live mutation; only on an explicit operator request |
+
+`remember` is always registered on the current server, independently of `MCP_ENABLE_WRITE_TOOLS` and `MCP_OPERATOR_TOKEN`, and needs no `Authorization` header. It still validates note content. Only `add_template` and `plugin_reload` are gated: they are registered when `MCP_ENABLE_WRITE_TOOLS=true` and a valid `MCP_OPERATOR_TOKEN` is configured, and their calls require the matching bearer header in the MCP client configuration. A gated call without that header returns `mutation_auth_required`; do not retry blindly or expose the token in output. `plugin_reload` changes live behavior and can invalidate derived indexes, so routine searches must never invoke it.
 
 ## Query formulation (`templatesearch` only)
 
-> **Scope — read first.** Everything in this section applies **only** to the **`templatesearch`** tool on this server. It does **not** apply to `docsearch`, `search_in_code`, `get_metadata_objects`, `ssl_search`, `recall`, or any other MCP tool — those keep their own query registers (keywords, identifiers, dotted paths, chapter titles, etc.). **Do not** pass task-description prose to `docsearch` / `search_in_code` because of this rule, and **do not** pass keyword salad to `templatesearch` because other tools accept keywords.
+> **Scope — read first.** Everything in this section applies **only** to the **`templatesearch`** tool on this server. It does **not** apply to `docsearch`, `search_in_code`, `get_metadata_objects`, `ssl_search`, `recall`, or any other MCP tool — those keep their own query registers (keywords, identifiers, Lucene, chapter titles, etc.). **Do not** pass task-description prose to `docsearch` / `search_in_code` because of this rule, and **do not** pass keyword salad to `templatesearch` because other tools accept keywords.
 
 Templates are **ready-made solutions to typical tasks**, indexed by how tasks are described. For **`templatesearch` only**, the `query` argument must be the **user's task description** — Russian prose stating what to achieve — not a compressed keyword line and not query-language tokens.
 
@@ -62,13 +69,28 @@ The obligation is scoped to **goal-matching** templates only. Vector search alwa
 
 1. **Match found → copy-then-adapt.** Start the draft by **pasting the template body** (query / code), then edit it toward the task. Do not write a fresh draft «по мотивам»: if the delivered query / code shares no recognizable structure with the template you built on (temp-table chain, join order, algorithm skeleton, platform API calls), the delivery is defective — redo it from the template. In the final answer, name the base in one line: `Template: <short name> — used as base`.
 2. **No match → one short note.** «Подходящего шаблона не нашлось» (item 4 above) is enough; do not enumerate or critique the non-matching candidates.
-3. **Rejecting a goal-matching template needs a narrow reason**: a platform-version / `РежимСовместимости` incompatibility confirmed by docs, or an explicit user requirement the template contradicts. «Мне удобнее по-другому», style preference, distrust of the template's shape, or the urge to rewrite are **not** valid reasons. A template that solves the core task but needs adaptation is a **match** — adapt it (item 1 above), do not reject it.
+3. **Rejecting a goal-matching template needs a narrow, nameable reason.** Exactly three are valid:
+   - a platform-version / `РежимСовместимости` incompatibility confirmed by docs;
+   - an explicit user requirement the template contradicts;
+   - **a project-rule violation you can name** — an anti-pattern from `standards(name="anti-patterns")`, a forbidden construct from `standards(name="dev-standards-code-style") §2`, or a documented ITS-standard violation. Naming it is mandatory: "выглядит неоптимально" is not a reason, «запрос в цикле (`standards(name="anti-patterns") §1`)» is.
+
+   «Мне удобнее по-другому», style preference, distrust of the template's shape, or the urge to rewrite are **not** valid reasons. A template that solves the core task but needs adaptation is a **match** — adapt it (item 1 above), do not reject it.
+
+4. **A project-rule violation is a reason to fix the template, not usually to drop it.** Most findings are local — a missing `ПЕРВЫЕ N`, a redundant `РАЗЛИЧНЫЕ`, an unindexed temp table, a `Сообщить()` call, a `Попытка` around a DB read. Keep the template's proven structure and repair the defect in place; report it as `Template: <short name> — used as base, fixed: <anti-pattern>`. Full rejection is correct only when the violation **is** the structure (the template's core algorithm is a query in a loop, a correlated subquery per row, an object read inside a posting loop) — there the salvageable part is the intent, not the code. Report that as `Template: <short name> — rejected: <anti-pattern / rule>`.
+
+   The template library is not a source of truth about project standards: a template that predates a rule still returns as a match. This item is the only legitimate channel for that case — silently hand-rolling an equivalent and saying nothing remains a defect (item 2 of *Using a found template*).
 
 **Good:** template has a hierarchical-catalog query → paste/adapt its query, rename `Справочник.Номенклатура` and output fields to the task; final answer says which template was the base.
 
 **Good:** search returned 5 candidates, none solves the task's goal → one line «no fitting template found», solution designed from project code / docs; no candidate-by-candidate review.
 
+**Good:** goal-matching template selects the whole table without `ПЕРВЫЕ N` → keep the template's structure, add the limit, report `Template: <name> — used as base, fixed: missing ПЕРВЫЕ N (anti-patterns §5)`.
+
+**Good:** goal-matching template's core algorithm reads each document object inside a loop → structural anti-pattern, rebuild as a set-based query, report `Template: <name> — rejected: object read in a loop (anti-patterns §1)`.
+
 **Defect:** template returned the standard «groups + hierarchy level» query → agent writes a different query from memory instead.
+
+**Defect:** agent rejects a goal-matching template as «неоптимальный» without naming the rule it violates — an unnamed objection is a style preference, not a reason.
 
 **Defect:** template found and goal-matching → agent silently ignores it and delivers a hand-rolled equivalent.
 
@@ -83,22 +105,14 @@ The obligation is scoped to **goal-matching** templates only. Vector search alwa
 
 ## Notes on `remember`
 
+- Before calling `remember`, confirm that the tool is exposed; do not require an operator token or Authorization pre-flight. The connected surface and actual answer govern compatibility with older deployments: if the tool is absent or the call returns `mutation_auth_required`, use the documented memory fallback instead of looping or assuming the current server requires authentication.
 - Write in English, one self-contained fact per note, preserving original 1C identifiers and affected object / module names as-is.
+- A `stored=true` / `index_pending=true` answer with an `id` is already durable even if `success=false`; indexing is pending, so do not repeat the write or create a fallback copy.
 - Do not save secrets or PII.
-- Call `remember` proactively: when the user corrects you, clarifies a non-obvious detail, or adjusts your interpretation of the task.
-- **Standing working conditions are remember-worthy too**, not only object-level facts. If the user states a condition that will shape *future* tasks — "I am benchmarking you", "objects from task statements may not exist in the configuration", "always prefer built-in platform mechanisms" — save it immediately, in the same turn where it was said. The test: *would the next session behave differently if it knew this?* If yes and it is not already in the rules — `remember` now; deferring to "later" loses it.
-- Call `recall` at the start of any non-trivial task with key terms (object name, subsystem, error message). Since standing conditions are also stored, add a generic pass when starting a new session's first task: `recall` with terms like `working conditions`, `benchmark`, `conventions` alongside the task-specific query.
+- What to save, when to call `recall` / `remember`, the two hard gates (recall-first, correction-capture) and the `Memory:` line are owned by `content/rules/project-memory.md`; standing working conditions («I am benchmarking you», «objects from the task may not exist») are saved in the same turn like any correction.
 
-### Memory gates — hard checks (canon: `AGENTS.md → Project memory → Memory gates`)
-
-1. **Correction-capture gate.** Any user message that corrects your output, rejects an approach, clarifies a non-obvious fact, or states a standing condition **must produce a `remember` call in the same turn** (fallback: `memory.md → Captured during work` when the server is unavailable). Before ending such a turn, run the check: *did this message change how I or the next session should work? → saved?* Replying to the correction without saving it is a defect — the correction is lost for every future session.
-2. **Recall-first gate.** For any non-trivial 1C task, `recall` runs **before** solution design — same standing as `templatesearch` in the pre-flight. Skipping it while the server is exposed is a defect.
-3. **Memory line in the final answer.** Non-trivial tasks report memory usage in one line: `Memory: recalled <n> notes / nothing relevant; saved <n> notes / nothing to save`. This makes silent skips visible and reviewable.
-
-**Defect:** the user says «я же просил использовать шаблон» (a correction of behavior) → agent apologizes, fixes the code, ends the turn — no `remember` (`rule-friction:` note per `AGENTS.md → Rules self-improvement`), no trace for the next session.
-
-**Good:** same situation → agent fixes the code **and** in the same turn saves `rule-friction: user corrected: template from templatesearch was found but ignored; must use matched templates as code base (task: transitive closure query)`.
+**Defect:** the user says «я же просил использовать шаблон» → agent apologizes, fixes the code, ends the turn — no `remember` (`rule-friction:` note per `AGENTS.md → Rules self-improvement`), no trace for the next session. **Good:** same situation → agent fixes the code **and** in the same turn saves `rule-friction: user corrected: template from templatesearch was found but ignored; must use matched templates as code base (task: transitive closure query)`.
 
 ## Availability check
 
-Treat the server as **available** only if the `remember` and `recall` tools are actually present in the current session's tool schema. The mere presence of `1c-templates-fastcode` in `.mcp.json` does not prove availability. If `recall` returns a connection error — switch to memory fallback mode (see `AGENTS.md → Project memory → Availability`).
+Check each capability separately. Template search is available when `templatesearch` is exposed. Memory read is available when `recall` is exposed. An exposed `remember` can be called without a token pre-flight; confirm persistence from its actual write result. The mere presence of `1c-templates-fastcode` in `mcp-servers.json` proves none of these. For older deployments, follow the exposed schema and actual response. If `recall` fails, or `remember` is absent or definitively rejects the write, switch the affected operation to memory fallback mode (`content/rules/project-memory.md → Availability and fallback`). A timeout or ambiguous write is unconfirmed and must be reconciled before another write.

@@ -53,12 +53,12 @@
 |----------|-------------|----------|
 | `autoTitle` | `<AutoTitle>` | `true` / `false`. **При наличии `title` компилятор сам инъектит `false`** (≈95% форм). Маркер `""` подавляет инъекцию (редкие формы с title, но без `<AutoTitle>`) |
 | `saveWindowSettings` | `<SaveWindowSettings>` | `true` / `false` |
-| `windowOpeningMode` | `<WindowOpeningMode>` | `LockOwnerWindow`, `Modeless` |
+| `windowOpeningMode` | `<WindowOpeningMode>` | `LockOwnerWindow`, `LockWholeInterface`, `Independent` (значения перечисления `РежимОткрытияОкнаФормы`; `Independent` — значение по умолчанию, Конфигуратор его не выгружает). Другое значение — отказ компиляции |
 | `commandBarLocation` | `<CommandBarLocation>` | `Top`, `Bottom`, `None` |
 | `saveDataInSettings` | `<SaveDataInSettings>` | `UseList`, `Use`, `DontUse` |
 | `autoSaveDataInSettings` | `<AutoSaveDataInSettings>` | `Use`, `DontUse` |
-| `autoTime` | `<AutoTime>` | `CurrentOrLast`, `Current`, `Last` |
-| `usePostingMode` | `<UsePostingMode>` | `Auto`, `Postings`, `Movements` |
+| `autoTime` | `<AutoTime>` | `CurrentOrLast`, `DontUse`, `CurrentOrFirst`, `First`, `Last` (перечисление `РежимАвтоВремя`). Другое значение — отказ компиляции |
+| `usePostingMode` | `<UsePostingMode>` | `Auto`, `Regular`, `RealTime` (перечисление `ИспользованиеРежимаПроведения`). Другое значение — отказ компиляции |
 | `repostOnWrite` | `<RepostOnWrite>` | `true` / `false` |
 | `autoURL` | `<AutoURL>` | `true` / `false` |
 | `enabled` | `<Enabled>` | `true` / `false` — доступность всей формы (редкое; форма-уровень) |
@@ -348,7 +348,7 @@ companion-панели с собственным контентом. Оба не
 | `BeforeDeleteRow` | `ПередУдалением` |
 | `BeforeRowChange` | `ПередНачаломИзменения` |
 | `OnStartEdit` | `ПриНачалеРедактирования` |
-| `OnEndEdit` | `ПриОкончанииРедактирования` |
+| `OnEditEnd` | `ПриОкончанииРедактирования` |
 | `Selection` | `ВыборСтроки` |
 | `OnCurrentPageChange` | `ПриСменеСтраницы` |
 | `TextEditEnd` | `ОкончаниеВводаТекста` |
@@ -357,6 +357,14 @@ companion-панели с собственным контентом. Оба не
 > `on` (массив имён событий) + `handlers` (переопределение имён): `{ "on": ["OnChange"], "handlers": { … } }`.
 > Компилятор по-прежнему его принимает ради совместимости, но рекомендуемый и
 > единственный эмитируемый формат — мапа `events`. Новые формы пишите через `events`.
+>
+> Все три записи дают один и тот же `<Events>`: `events`; `on` + `handlers`;
+> `handlers` **без** `on`. Одинаково для PowerShell и Python.
+>
+> Молчаливого выбора «одного из двух» нет — это отказ (exit `1`, файл не пишется):
+> `events` вместе с `on`/`handlers`; ключ в `handlers`, которого нет в `on`;
+> неизвестное имя события. Имя `OnEndEdit` — не событие платформы: нужное имя
+> `OnEditEnd`, автоимя обработчика — `ПриОкончанииРедактирования`.
 
 ### 4.3. Типы элементов
 

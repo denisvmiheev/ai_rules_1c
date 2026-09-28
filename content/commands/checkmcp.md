@@ -1,10 +1,13 @@
 ---
 description: Check availability of 1C MCP servers and install/start the missing ones
+userOnly: true
 ---
 
 # /checkmcp — check and install 1C MCP servers
 
-This command checks that all MCP servers from the project catalog (`content/mcp-servers.json`; after 1c-rules installation, rendered into the active tool config such as `.cursor/mcp.json` / `.mcp.json` / `.kilo/kilo.json` / `opencode.json` / `.codex/config.toml` / `.qwen/settings.json` / `.kimi-code/mcp.json`) are actually available in the current session, and helps start or install missing ones. For Kilo Code the rendered file uses the top-level `mcp` key with per-server `{ "type": "remote", "url": "...", "enabled": true }` — **not** the legacy `.kilocode/mcp.json` with `mcpServers` (current Kilo CLI / Kilo Code v7.x+ does not read that file). For Qwen Code, HTTP entries use `httpUrl` inside `.qwen/settings.json` → `mcpServers`. Cline and Pi have no project MCP file from this installer (Cline: configure globally; Pi: no built-in MCP).
+To connect already installed servers and memory to a new repository, use `/setupmcp` (`content/commands/setupmcp.md`). It collects their actual endpoints and writes project connections; `/checkmcp` keeps MCP configs read-only.
+
+This command checks that all MCP servers from the project catalog (`content/mcp-servers.json`; after 1c-rules installation, rendered into the active tool config such as `.cursor/mcp.json` / `.mcp.json` / `.kilo/kilo.json` / `opencode.json` / `.codex/config.toml` / `.qwen/settings.json` / `.kimi-code/mcp.json` / `.zcode/config.json` under `mcp.servers` / `mimocode.json` under `mcp`) are actually available in the current session, and helps start or install missing ones. Config file, top-level key and per-server shape per client — including the Kilo legacy `.kilocode/mcp.json` warning and the OpenCode `onec-` key rule — are owned by `/installmcp` → *Step 7. Per-client MCP config*; `install.ps1` renders the same placement. This command only reads those files.
 
 **External MCP installation (INSTALL.md, режим 3).** If `.ai-rules.json` has `integrations.mcp.mode = "external"` (or the env `BASESAI_MCP_GLOBAL_ROOT` points at a folder with `install.manifest.json`), the server set, ids, urls, and ports come from the **actual install artifacts**, not from the catalog or the default table below: read `install.manifest.json`, resolve paths via its `artifacts` / `consumers` / `resolution` contract (legacy manifest without `schema_version` → schema-v1 defaults: registry at `<GLOBAL_ROOT>/projects.registry.json`, global servers in `%USERPROFILE%/.cursor/mcp.json`, project servers in `<path_code>/.cursor/mcp.json`), then merge global + project `mcpServers` (project keys win on duplicate id). Ports are parsed **only from each server's `url`** (`localhost:<PORT>`); Docker container names come from the registry's project row (`containers.*`). The `mcp:install_forme` section of `USER-RULES.md` holds the rendered tables as a convenient cache. The catalog and the default ports below apply only to **managed** installs.
 
@@ -15,7 +18,7 @@ The source of truth for images, ports, and environment variables is [docs.onerpa
 | id | Port | Docker image | Purpose | Requires data |
 |---|---|---|---|---|
 | `1c-syntax-checker-mcp` | 8002 | `comol/1c_syntaxcheck_mcp:latest` | BSL syntax (BSL Language Server) | No |
-| `1c-templates-mcp` | 8004 | `comol/template-search-mcp:latest` | Templates and project memory (`remember`/`recall`) | No |
+| `1c-templates-fastcode` | 8004 | `comol/template-search-mcp:latest` | Templates and project memory (`remember`/`recall`) | No |
 | `1c-ssl-mcp` | 8008 | `comol/mcp_ssl_server:latest` | BSP/SSL search | No (`SSL_VERSION`) |
 | `1C-docs-mcp` | 8003 | `comol/1c_help_mcp:latest` | 1C platform help (RAG) + the `1c-standards` and `1c-format-specs` collections, which ship inside the image | Yes — platform `bin` folder |
 | `1c-code-metadata-mcp` | 8000 | `comol/1c_code_metadata_mcp:latest` | Metadata/code/forms/XSD | Yes — configuration dump |
@@ -25,9 +28,13 @@ The source of truth for images, ports, and environment variables is [docs.onerpa
 | `edt-mcp` | 8766 | — (MCP plugin **inside 1C:EDT**, **not** docker) | Metadata discovery & typed mutation, BSL read/write & navigation, EDT validation, debug/testing, DB update, event log — this fork's default 1C server, see `content/skills/mcp-1c-tools/docs/edt-mcp.md` | No container to install — start 1C:EDT with the [EDT-MCP plugin](https://github.com/DitriXNew/EDT-MCP) enabled |
 | `v8std-local` | 8765 | — (git clone + `docker compose`, **not** a published docker image) | Read-only v8std.ru mirror: ITS standards search, diagnostic↔standard mapping (ACC/АПК, BSLLS, EDT, v8-code-style) — this fork's default ITS-lookup server, see `content/skills/mcp-1c-tools/docs/v8std.md` | No — free, CC0, no license key; see the install note below |
 
+> The rows for `1c-syntax-checker-mcp`, `1c-code-metadata-mcp`, `1c-graph-metadata-mcp`, `1c-code-check-mcp` and `1c-data-mcp` belong to the classic docker distribution; this ruleset's default set is `edt-mcp`, `1C-docs-mcp`, `1c-ssl-mcp`, `1c-templates-fastcode` and `v8std-local`. Check the classic rows only for a project that installed that distribution.
+
 > Exact image names may differ by version. If `docker pull` fails with `manifest unknown`, check the current list at [docs.onerpa.ru/mcp-servery-1c/servery.md](https://docs.onerpa.ru/mcp-servery-1c/servery.md).
 
 > **Channel.** The `:latest` tags above are the **stable** channel. A project may deliberately run the **beta** channel — the same images with a `-beta` suffix (`comol/1c_help_mcp:latest-beta`, also `light-beta` / `arm64-beta`). `/checkmcp` never changes the channel; it only reports the tag each container actually runs. The contract (tag matrix, `IMAGE_TAG`, how to verify a tag) is `/installmcp` → `## Release channel — stable or beta (IMAGE_TAG)`; switching is `/updatemcp beta` / `/updatemcp stable`.
+
+> **Templates authentication.** `templatesearch`, `recall`, `list_templates`, `get_template`, and `plugin_state` are read-only. Current `remember` is always registered and needs no operator token or write-tools opt-in. Only `add_template` and `plugin_reload` are conditional mutations: they require write tools enabled and an `Authorization` bearer header from `MCP_OPERATOR_TOKEN`. Their absence alone is not `TOOLS_MISSING`; `mutation_auth_required` on a gated call means repair that connection, never restart or regenerate data blindly. Older deployments may differ: report the observed surface and memory-write availability separately.
 
 > `edt-mcp` is **out of scope for this command**. It is not a container and not part of the bundle: the plugin runs inside 1C:EDT itself and exists only in projects with `.dev.env` `USE_EDT=true`. Do not add it to the catalog above, do not try to start it with docker, and do not report it missing here — its status belongs to `/installtools status`, its installation to `/install-edt-mcp`.
 
@@ -80,7 +87,7 @@ The source of truth for images, ports, and environment variables is [docs.onerpa
    $servers  = @($project) + @($global | Where-Object { $_.Id -notin $project.Id })
    ```
 
-2. Else, if the project has `.ai-rules.json`, take the catalog from the active tool config referenced by the manifest (`.cursor/mcp.json` / `.mcp.json` / `.kilo/kilo.json` under the `mcp` key / `opencode.json` under the `mcp` key / `.codex/config.toml` under `[mcp_servers."<id>"]` / `.qwen/settings.json` under `mcpServers` with `httpUrl` / `.kimi-code/mcp.json`). A leftover `.kilocode/mcp.json` is **legacy** — ignore it; current Kilo CLI / Kilo Code (v7.x+) does not read it. In `opencode.json` the server keys are letter-normalized to `onec-...` (e.g. `onec-syntax-checker-mcp`) because OpenCode names tools `<server-key>_<tool>` and providers like Moonshot/Kimi reject digit-leading function names — match them to the canonical `1c-...` ids by the bare tool names below, not by the prefix.
+2. Else, if the project has `.ai-rules.json`, take the catalog from the active tool config referenced by the manifest (`.cursor/mcp.json` / `.mcp.json` / `.kilo/kilo.json` under the `mcp` key / `opencode.json` under the `mcp` key / `.codex/config.toml` under `[mcp_servers."<id>"]` / `.qwen/settings.json` under `mcpServers` with `httpUrl` / `.kimi-code/mcp.json` / `.zcode/config.json` under `mcp.servers` / `mimocode.json` under `mcp`). A leftover `.kilocode/mcp.json` is **legacy** — ignore it. In `opencode.json` the server keys are `onec-...` (e.g. `onec-syntax-checker-mcp`; why — `/installmcp` → *Step 7*) — match them to the canonical `1c-...` ids by the bare tool names below, not by the prefix.
 3. Otherwise use `content/mcp-servers.json` from the rules repository.
 4. If neither source exists, use the table above as the default set.
 
@@ -88,12 +95,17 @@ The source of truth for images, ports, and environment variables is [docs.onerpa
 
 For each `id`, determine **TOOLS_OK** / **TOOLS_MISSING**:
 
-- **TOOLS_OK** — this server's tools are visible in the current session tool schema (for example, `syntaxcheck` for `1c-syntax-checker-mcp`, `templatesearch`/`recall` for `1c-templates-mcp`, `ssl_search` for `1c-ssl-mcp`, `docinfo`/`docsearch`/`standards`/`formatspec` for `1C-docs-mcp`, `metadatasearch`/`codesearch` for `1c-code-metadata-mcp`, `search_metadata`/`get_object_dossier` for `1c-graph-metadata-mcp`, `check_1c_code`/`its_help` for `1c-code-check-mcp`, `get_metadata_objects`/`search_in_code` for `edt-mcp`, `v8std_search`/`v8std_explain_diagnostics` for `v8std-local`).
+- **TOOLS_OK** — this server's tools are visible in the current session tool schema. Tool-name → server map (canon — `/doctor` Check 5 points here):
+  - `templatesearch`, `recall`, `remember` (memory write is ungated on current builds) — `1c-templates-fastcode`;
+  - `ssl_search` — `1c-ssl-mcp`;
+  - `docinfo`, `docsearch`, `standards`, `formatspec` — `1C-docs-mcp` (**`standards` / `formatspec` missing while `docsearch` is present is a WARN of its own**: the routed rules of `content/rules/` have no bodies in this image — recommend pulling a current `comol/1c_help_mcp`; `outcome: "unavailable"` / `status: degraded` on every call means the docs index is not built — see the server logs);
+  - `get_metadata_objects`, `search_in_code`, `get_module_structure`, `revalidate_objects`, `get_project_errors` — `edt-mcp` (full catalog — `content/skills/mcp-1c-tools/docs/edt-mcp.md`);
+  - `v8std_search`, `v8std_explain_diagnostics`, `v8std_get_page` — `v8std-local`.
 - **TOOLS_MISSING** — no tools are visible in the schema.
 
 If status is **TOOLS_OK**, treat the server as working and do not check it further.
 
-**`1C-docs-mcp` partial exposure — report as WARN.** If `docsearch` / `docinfo` are visible but **`standards` is not**, the server is running an image that predates the collection tools. The routed rules of `content/rules/` (`anti-patterns`, `dev-standards-architecture`, `dev-standards-code-style`, …) carry headings without bodies and cannot be retrieved on this image — report it, name `standards` as the missing tool, and recommend pulling a current `comol/1c_help_mcp`. Do **not** suggest reaching the standards through `docsearch`: that collection is not reachable from it, and no tool of this server accepts a `corpus` argument (`content/rules/help-corpus-retrieval.md`).
+**`1C-docs-mcp` partial exposure — report as WARN (canon — `/doctor` points here).** If `docsearch` / `docinfo` are visible but **`standards` is not**, the server is running an image that predates the collection tools. The routed rules of `content/rules/` (`anti-patterns`, `dev-standards-architecture`, `dev-standards-code-style`, …) carry headings without bodies and cannot be retrieved on this image — report it, name `standards` as the missing tool, and recommend pulling a current `comol/1c_help_mcp`. Do **not** suggest reaching the standards through `docsearch`: that collection is not reachable from it, and no tool of this server accepts a `corpus` argument (`content/rules/help-corpus-retrieval.md`).
 
 ### Step 3. Check HTTP endpoint
 
@@ -104,7 +116,7 @@ $servers = @(
     @{ Id = '1c-code-metadata-mcp';   Port = 8000 },
     @{ Id = '1c-syntax-checker-mcp';  Port = 8002 },
     @{ Id = '1C-docs-mcp';            Port = 8003 },
-    @{ Id = '1c-templates-mcp';       Port = 8004 },
+    @{ Id = '1c-templates-fastcode';       Port = 8004 },
     @{ Id = '1c-graph-metadata-mcp';  Port = 8006 },
     @{ Id = '1c-code-check-mcp';      Port = 8007 },
     @{ Id = '1c-ssl-mcp';             Port = 8008 },
@@ -209,16 +221,18 @@ Command templates (minimal set without data preparation):
 
 ```powershell
 # 1c-syntax-checker-mcp
-# Optional: mount the project sources read-only and set FILES_DIR to enable the
-# 'syntaxcheck_file' tool (file check by path — cheaper than passing code text).
-# Without the mount only 'syntaxcheck' (code as text) is available.
+# The read-only sources mount + FILES_DIR enables the 'syntaxcheck_file' tool
+# (the default form of the syntax gate). The optional beta-only FULLINDEX mode
+# (-e FULLINDEX=true + an index volume) is described in /installmcp -> Step 6;
+# a container without it is a normal, fully working install, and the channel
+# is never switched to beta just to obtain it.
 docker run -d -p 8002:8002 --name 1c_syntaxcheck_mcp `
   -e LICENSE_KEY={LICENSE_KEY} `
   -e FILES_DIR=/files `
   -v "{PROJECT_ROOT}:/files:ro" `
   comol/1c_syntaxcheck_mcp:latest
 
-# 1c-templates-mcp
+# 1c-templates-fastcode
 docker run -d -p 8004:8004 --name 1c_templates_mcp `
   -e LICENSE_KEY={LICENSE_KEY} `
   -v "{DATA_ROOT}\mcp_templates:/app/chroma_db" `

@@ -2,6 +2,12 @@
 
 Comprehensive database management: registry (.v8-project.json) and platform operations (create, run, update, dump/load configuration).
 
+## Integration with configuration synchronization
+
+Read `content/rules/getconfigfiles.md → Configuration file synchronization contract` for transfer scope, object lists vs file lists, baseline handling and failure boundaries. `/loadfrom1cbase` orchestrates directory refresh (full / changes / partial via `/getconfigfiles`); `/update1cbase` orchestrates full / partial / Git load, checks and database apply; `/deploy-and-test` inherits that deployment sequence.
+
+These scripts implement individual stages. When a database update is already requested, continue from a successful load through the required checks to `db-update`; do not stop to offer the already requested next stage. Keep load and apply separate (omit loader `-UpdateDB`) when the orchestrator must run extension applicability checks between them. Use one executor per stage and the same infobase, extension and source root throughout.
+
 ---
 
 ## Part 1: Database Registry (.v8-project.json)
@@ -269,6 +275,8 @@ powershell.exe -NoProfile -File skills/1c-metadata-manage/tools/1c-db-ops/script
 
 After loading: offer to run `db-update` to apply changes to the database.
 
+Within `/update1cbase` or `/deploy-and-test`, the apply stage is already part of the request: run the required checks, then continue to it.
+
 ---
 
 ### 6. Dump Configuration to XML
@@ -294,7 +302,11 @@ powershell.exe -NoProfile -File skills/1c-metadata-manage/tools/1c-db-ops/script
 | `Partial` | Partial — selected objects from `-Objects` parameter |
 | `UpdateInfo` | Update only ConfigDumpInfo.xml without dumping files |
 
-> **When dumping**: if user doesn't specify dump type (full or incremental), ask before executing.
+Choose the mode from the task and `/loadfrom1cbase → Select scope`; state the inferred choice instead of asking again when the scope is established. Partial mode accepts **metadata names**, not import file paths; include needed separate development objects explicitly. Check the dirty destination and a non-empty selection before running.
+
+Designer mappings: `Full` → `/DumpConfigToFiles`; `Changes` → `-update -force`; `Partial` → `-listFile` generated from `-Objects`; `UpdateInfo` → `-configDumpInfoOnly`. `Changes` therefore permits a full dump on a format-version mismatch. When that wider overwrite is not authorized, use the command's Designer `-update` template without `-force`. Missing baselines must be resolved before the run; `UpdateInfo` does not export files or establish that their contents match the infobase.
+
+For `-getChanges` reports or `-configDumpInfoForChanges` delta exports, use the Designer procedure in the synchronization contract. This wrapper has no dedicated parameters for those modes. Keep their report/baseline/output paths distinct; a delta output directory must start empty.
 
 ---
 
@@ -315,7 +327,9 @@ powershell.exe -NoProfile -File skills/1c-metadata-manage/tools/1c-db-ops/script
 | `-Extension <name>` | Load into extension |
 | `-Format <format>` | `Hierarchical` (default) / `Plain` |
 
-After loading: offer to run `db-update`.
+Partial mode accepts **file paths** through exactly one of `-Files` / `-ListFile`; validate scope, existence and dependencies first. A raw platform list is UTF-8 with no blank lines. The Designer branch writes its own list, adds `-partial -updateConfigDumpInfo`, and uses `-Format`; confirm the platform supports the intended flags. It excludes service files (`ConfigDumpInfo.xml`, `ParentConfigurations.bin`) from partial loading. If those exclusions omit part of the requested change, resolve the scope instead of reporting a complete deployment. Do not combine partial mode with `-AllExtensions`.
+
+Standalone load-only requests finish after loading. In `/update1cbase` / `/deploy-and-test`, continue with checks and `db-update`; a successful import or updated baseline is not a completed database update.
 
 ---
 
@@ -344,7 +358,7 @@ Determines changed configuration files from Git data and performs partial load i
 | `Unstaged` | Modified but not indexed + untracked |
 | `Commit` | Files from commit range (requires `-CommitRange`) |
 
-After loading: offer to run `db-update`.
+Run `-DryRun` first to inspect the exact scope. Resolve deletions, renames, missing dependencies and excluded files before loading; files absent from the working tree are not automatically a successful metadata deletion. A no-change plan is a no-op. After a successful load, follow the same checks → `db-update` sequence when database update was requested.
 
 ---
 
@@ -406,6 +420,8 @@ If the base is busy (active sessions), the load fails: for a server base pass `-
 ... db-load-xml ... -Mode Partial -Files "CommonModules/MyModule/Ext/Module.bsl"
 ```
 
+Within a database update, continue with the applicable checks and `db-update`. If a source-directory refresh is also requested, use `/loadfrom1cbase` after successful apply, preserving local changes and the same extension scope.
+
 #### Load Git Changes into Database
 
 ```powershell
@@ -426,9 +442,9 @@ If the base is busy (active sessions), the load fails: for a server base pass `-
 
 `db-load-cf` / `db-load-xml` / `db-load-git` / `db-update` failures are handled **iteratively**, mirroring `content/commands/update1cbase.md → Update retry loop`:
 
-1. **Log after every attempt, success or not.** Exit code 0 does not prove success — the platform writes errors like `Неверное свойство объекта метаданных`, `Неизвестное имя типа`, `Ошибка при обновлении конфигурации базы данных` to the log while formally exiting clean (`db-load-xml` already parses for these; still read the log output the script shows). A diagnostic line = failed attempt — but classify the platform's **success phrases first** (`Ошибок не обнаружено`, `Предупреждений: 0` contain the same word stems), otherwise a clean run reads as a failure. Order and pattern list — `content/rules/designer-batch-checks.md → The success-phrase trap`.
+1. **Log after every attempt, success or not.** Exit code 0 does not prove success — the platform writes errors like `Неверное свойство объекта метаданных`, `Неизвестное имя типа`, `Ошибка при обновлении конфигурации базы данных` to the log while formally exiting clean. The scripts already close part of that gap: every Designer launch passes `/DumpResult` and turns a non-zero (or missing) batch result into a non-zero script exit, and `db-load-xml` / `db-update` also scan the log for known failure lines. Still read the log output the script shows. A diagnostic line = failed attempt — but classify the platform's **success phrases first** (`Ошибок не обнаружено`, `Предупреждений: 0` contain the same word stems), otherwise a clean run reads as a failure. Order and pattern list — `content/rules/designer-batch-checks.md → The success-phrase trap`.
 2. **Terminate a hung / failed Configurator before retrying.** A dead-but-alive Designer process holds the configuration lock, and every next attempt fails with `База данных заблокирована`. Kill only the process this run started (by PID with a timeout); never blanket-kill all `1cv8` processes — the user's own Designer / client sessions may be among them. A lock that survives your process's death is foreign — report it, do not kill further.
-3. **Fix before retry.** Re-running against unchanged sources is forbidden. Fix the logged cause first (source XML/BSL — through this skill's tools plus `verify_xml` / `syntaxcheck`; parameters — in `.dev.env` / flags). After a failed **load**, restart from the load step, not from `db-update` — the half-loaded state is not trustworthy.
+3. **Fix before retry.** Re-running against unchanged sources is forbidden. Fix the logged cause first (source XML/BSL — through this skill's tools plus `revalidate_objects` + `get_project_errors`; parameters — in `.dev.env` / flags). After a failed **load**, restart from the load step, not from `db-update` — the half-loaded state is not trustworthy.
 4. **Budget: 3 full attempts.** Then stop and report the last log fragment, the fixes applied between attempts, and the remaining error. A failed update is never reported as done.
 
 ### Important
@@ -440,26 +456,4 @@ If the base is busy (active sessions), the load fails: for a server base pass `-
 
 ---
 
-## Recent Additions (upstream sync `2026-07-30`)
-
-The PowerShell scripts under `tools/1c-db-ops/scripts/` were refreshed from [Nikolay-Shirokov/cc-1c-skills](https://github.com/Nikolay-Shirokov/cc-1c-skills). Highlights of this sync (previous base: late May 2026):
-
-- **`db-dump-dt` / `db-load-dt`** — new: full infobase snapshot (configuration + data). See sections 9 and 10.
-- **All `db-*` / `epf-*`** — `-AdditionalV8Arguments` / `-AdditionalIbcmdArguments` with per-engine validation and secret masking (see *Common Parameters*); project-wide defaults via `v8args` / `ibcmdargs` in `.v8-project.json`.
-- **Platform resolution** — unified across the scripts: explicit `-V8Path` → project config → auto-detect the newest `C:\Program Files\1cv8\*\bin\1cv8.exe`. Locally patched so the project config is read from **`.dev.env`** (`PLATFORM_PATH`, `PLATFORM_ARGS`, `IBCMD_ARGS`, `SUPPORT_GUARD`) before upstream's `.v8-project.json`, and so a **version install directory** — the shape `PLATFORM_PATH` uses — resolves via `bin\1cv8.exe`.
-- **`db-load-xml`** — strict log parsing. Catches "Неверное свойство объекта метаданных", "Неизвестное имя типа" and similar messages that the platform writes to the log despite a formal "success" exit. Previously a partial silent metadata loss was reported as a green run.
-- **`db-load-xml` / `db-load-git`** — `-UpdateDB` flag combines load + database update in a single Configurator launch (was two separate calls).
-- **`db-load-git`** — picks up changes to HTML help (`ru.html` and similar) via partial load even without the accompanying `Help.xml` in the commit. Previously such edits were silently dropped and the help text in the base stayed stale. Fixed search for changed files when sources live in a nested folder of the repo (`src/cf` etc.); path normalisation for the configuration directory is corrected.
-- **db-list** — already fully described in Part 1 of this doc (registry of `.v8-project.json`). It is a no-script skill in upstream — the agent reads / writes the JSON directly. No script files were added under `tools/`.
-
-## MCP Integration
-
-- **metadatasearch** — Verify object names when doing partial loads.
-- **get_metadata_details** — Get object structure for verifying load targets.
-- **docsearch** — Platform documentation on Designer command-line parameters.
-
-## SDD Integration
-
-When creating or modifying databases as part of a project, update SDD artifacts if present (see `content/rules/sdd-integrations.md` for detection):
-
-- **OpenSpec**: If the database setup is part of a tracked change, note the environment configuration in the active proposal under `openspec/changes/<change-id>/design.md`.
+Scripts vendored from Nikolay-Shirokov/cc-1c-skills; sync history — `docs/CHANGELOG.md`.

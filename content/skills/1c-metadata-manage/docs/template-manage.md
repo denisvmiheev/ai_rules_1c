@@ -10,7 +10,7 @@ Creates or removes a template (layout) of specified type and registers/unregiste
 
 | Parameter | Required | Default | Description |
 |-----------|:--------:|---------|-------------|
-| ObjectName | yes | — | Object name (for EPF) or object path |
+| ObjectName | yes | — | Object name, or absolute / relative path to the object's `.xml` file; alias `ProcessorName` |
 | TemplateName | yes | — | Template name |
 | TemplateType | yes | — | Type: HTML, Text, SpreadsheetDocument, BinaryData |
 | Synonym | no | = TemplateName | Template synonym |
@@ -21,6 +21,16 @@ Creates or removes a template (layout) of specified type and registers/unregiste
 ```powershell
 powershell.exe -NoProfile -File skills/1c-metadata-manage/tools/1c-template-manage/scripts/add-template.ps1 -ProcessorName "<ObjectName>" -TemplateName "<TemplateName>" -TemplateType "<TemplateType>" [-Synonym "<Synonym>"] [-SrcDir "<SrcDir>"]
 ```
+
+### Command (configuration or extension object)
+
+```powershell
+powershell.exe -NoProfile -File skills/1c-metadata-manage/tools/1c-template-manage/scripts/add-template.ps1 -ObjectName "SNiS/Documents/эс_ПланПотребностейВМатериалах.xml" -TemplateName "ПФ_КомплектовочнаяВедомость" -TemplateType SpreadsheetDocument
+```
+
+A relative XML path is resolved from the current directory, then from `SrcDir`. The descriptor and content are created beside that XML under `<ObjectName>/Templates/`; `SrcDir` is not required for an existing XML path. Name-only calls retain EPF lookup and lookup in configuration object-type folders under `SrcDir`.
+
+`meta-edit add-template` is refused before any mutation in both runtimes; use this scaffold and select `TemplateType` explicitly. This scaffold currently ships as PowerShell only.
 
 ### Type Mapping
 
@@ -103,12 +113,4 @@ The script refuses a real deletion without `-Force`. It parses and serializes th
 3. `1c-mxl-validate` — validate template structure
 4. `1c-mxl-info` — analyze template structure
 
-## MCP Integration
-
-- **metadatasearch** — Verify the parent object exists and supports templates.
-- **get_metadata_details** — Get parent object structure to confirm template compatibility.
-- **templatesearch** — Find similar template implementations.
-
-## Upstream sync `2026-07-30`
-
-Scripts refreshed from [Nikolay-Shirokov/cc-1c-skills](https://github.com/Nikolay-Shirokov/cc-1c-skills): `template-add` v1.5 → **v1.10**, `template-remove` → **v1.3**. `template-add` enforces the vendor support gate — it refuses to add a template to a locked object of a typical configuration ([support-manage.md](support-manage.md)). `template-remove` keeps the local hardening (preflight parse, atomic root-XML write, `-DryRun` / `-Force`).
+Scripts vendored from Nikolay-Shirokov/cc-1c-skills; sync history — `docs/CHANGELOG.md`.

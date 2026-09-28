@@ -1,6 +1,6 @@
 ---
 name: v8unpack-cf
-description: "Read and write 1C binary artifacts without the 1C:Enterprise platform. Two workflows: an ordinary form (обычная форма) `Ext/Form.bin` through the `unpack_ordinary_form` / `build_ordinary_form` MCP tools, and a whole CF / CFE / EPF through the `v8unpack` CLI. Use when the task mentions `Form.bin`, обычные формы, a form with no `Form.xml`, or when you have a binary artifact and no infobase / Designer / `ibcmd`."
+description: "Read and write 1C binaries without the platform: an ordinary form `Ext/Form.bin` via the `unpack_ordinary_form` / `build_ordinary_form` MCP tools, a whole CF / CFE / EPF via the `v8unpack` CLI. Use for `Form.bin`, обычные формы, or a binary with no infobase / Designer / `ibcmd`."
 ---
 
 # v8unpack-cf — read and write 1C binary artifacts
@@ -39,9 +39,7 @@ Find them with `**/Forms/*/Ext/Form.bin`. A form whose `Form.xml` appears to be
 ### The MCP contract — `ordinary-form/1`
 
 The same two tools, with the same arguments and the same result payload, are
-published by **`1c-code-metadata-mcp`** and **`1c-graph-metadata-mcp`**. Learn them
-once. On the graph server the payload arrives in the envelope's `data` section; on
-the code server it is the result itself.
+published by the classic docker distribution's code-metadata and graph servers. This ruleset's default servers (`edt-mcp` and friends) do not expose them: use this skill's own Python `v8unpack` route below. The payload contract is the same.
 
 #### `unpack_ordinary_form`
 
@@ -135,6 +133,16 @@ single-quoted literals (`'C:\src\...\Form.bin'`) when the path contains `$`.
   container is a whole CF / CFE / EPF and is refused with
   `unsupported_container_layout`; an entry that is itself a container is kept whole
   rather than descended into, which is what keeps the round trip lossless.
+- **Never Deflate the entries of a `Form.bin`.** 1C:Enterprise reads the `form` and
+  `module` streams of a standalone ordinary form only as plain UTF-8 BOM text; a
+  deflated stream is «Ошибка формата потока» and the thick client exits (observed on
+  8.3.27.2074, in Designer and in Enterprise alike — a 728 KB form packed to 114 KB
+  never opened again until it was repacked plain). Designer writes them plain.
+  `build_ordinary_form` writes every entry plain whatever the manifest's `deflated`
+  flag says (the flag records how the *source* stored the entry; a deflated source
+  is reported in `warnings` on unpack and in `notes` on build). Do not "optimise"
+  a `Form.bin` with any repacking tool's `-deflate` / `-pack` — the size it saves is
+  the form it loses.
 - **Do not judge a round trip by the final SHA-256.** `v8unpack` stamps container
   records with the current time, so a rebuilt `Form.bin` differs byte for byte from
   its source even when nothing changed. `binary_identical: false` together with
@@ -191,6 +199,17 @@ python -m v8unpack -E "<file.cf>" "<sources_dir>" --temp "<temp_dir>"
 ```bash
 python -m v8unpack -B "<sources_dir>" "<file.cf>"
 ```
+
+**`-B` rebuilds what `-E` wrote — it is not a way to produce a `.cf` for loading
+into an infobase of a current configuration.** On a real 8.3.27 configuration the
+round trip degraded the metadata: XML descriptors of version 3 came back as
+version 2 (`Задача`), standard attributes broke, objects dropped out of the
+exchange-plan content (УРБД). The library decodes metadata through its own,
+version-bounded parsers, and what it does not know it does not write back. Use it
+for a data processor / extension you extracted with the same version, or to
+inspect; a configuration goes back into an infobase only through the platform
+(`/LoadConfigFromFiles` from the Designer file export, or `/LoadCfg` of a file the
+platform wrote).
 
 | Parameter | Description |
 |-----------|-------------|
@@ -305,10 +324,13 @@ Of ordinary forms specifically — measured on a real extraction (`1C-Gitter`
   layout has to be read from `Form.bin` — positionally.
 - **`v8unpack` 1.2.6 cannot write a container with compressed entries through
   `Container.build(nested=False)`** — it raises `struct.error`, because
-  `Document.compress` returns no table-of-contents offset. The MCP codec sidesteps
-  this: it deflates an entry itself when the source stored it deflated, and writes
-  the container with verbatim entries. Nothing to do at the call site; relevant
-  only if you drive the library directly.
+  `Document.compress` returns no table-of-contents offset. Irrelevant for a
+  `Form.bin`: its entries must be plain anyway (see *Warnings*), and the MCP codec
+  writes them plain with verbatim (`nested=True`) container records. Relevant only
+  if you drive the library directly for a whole CF / CFE / EPF.
+- **A `.cf` rebuilt with `-B` from a current configuration is not the
+  configuration** — see *Build (`-B`)* above. Observed metadata degradation on
+  8.3.27; the platform is the only writer of a loadable configuration file.
 - A rebuilt binary's SHA-256 always differs from its source (write timestamps).
   See the warning above.
 
@@ -322,5 +344,5 @@ Of ordinary forms specifically — measured on a real extraction (`1C-Gitter`
   are this skill's, because there is no XML for it to edit.
 - `forms.md` — the router for managed-form work. It sends ordinary forms here.
 - `mcp-1c-tools` — the MCP catalog. `unpack_ordinary_form` / `build_ordinary_form`
-  are listed there under both `1c-code-metadata-mcp` and `1c-graph-metadata-mcp`;
-  this file is the contract they share.
+  are exposed only by the classic docker distribution's servers;
+  this file is the contract they share and the Python route that replaces them.
