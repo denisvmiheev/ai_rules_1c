@@ -18,7 +18,7 @@ This server is **conditional** in the sense that it exists only on a workstation
 
 ## Toolsets
 
-`core`, `metadata`, `code`, `debug`, `testing`, `profiling`, `forms`, `tags`, `translation`, `project`, `comparison`, `git`. Composition follows the installed plugin version — `list_toolsets` is authoritative when this file and the session disagree. Besides progressive disclosure, individual tools can be switched off in EDT Preferences → MCP Server → Tools (the `git` tool is off by default; debug / profiling tools may be too): a tool listed by `list_toolsets` but absent from `tools/list` is disabled there, not missing. This catalog describes plugin 2.17.
+`core`, `metadata`, `code`, `debug`, `testing`, `profiling`, `forms`, `tags`, `translation`, `project`, `comparison`, `git`. Composition follows the installed plugin version — `list_toolsets` is authoritative when this file and the session disagree. Besides progressive disclosure, individual tools can be switched off in EDT Preferences → MCP Server → Tools (the `git` tool is off by default; debug / profiling tools may be too): a tool listed by `list_toolsets` but absent from `tools/list` is disabled there, not missing. This catalog describes plugin 2.18.
 
 ## Core — discovery and reading
 
@@ -77,10 +77,12 @@ No hand-written XML: metadata is created and edited through a typed FQN API that
 | **get_markers** | Bookmarks and TODO / FIXME / XXX / HACK task markers | Technical-debt inventory (`TODO No.<task>:` per the code-style standard) |
 | **clean_project** | DISK → MODEL full rebuild + revalidation | Slow; discards unsaved in-memory model edits. Prefer `revalidate_objects` for one object |
 | **resync_to_disk** | MODEL → DISK: export missing `.mdo`, report / clean dangling `Configuration.mdo` references | Fixes "object file does not exist" and `md-reference-intergrity` failures that block `update_database` |
-| **update_database** | Apply the configuration to an infobase, full or incremental | Two-phase: call without `confirm` for a preview, then `confirm=true`. Auto-terminates 1C clients this EDT launched; refuses while a non-agent standalone-server session is open (`checkInfobaseSessions`); `externalInfobaseChanges` answers the "changed outside EDT" modal (`override` / `import` / `cancel`). A 5–25 min run outlives a client timeout — read the outcome with `get_mcp_history`. Driven by `/update1cbase → EDT path` |
+| **update_database** | Apply the configuration to an infobase, full or incremental | Two-phase: call without `confirm` for a preview, then `confirm=true`. Auto-terminates 1C clients this EDT launched; refuses while a non-agent standalone-server session is open (`checkInfobaseSessions`); `externalInfobaseChanges` answers the "changed outside EDT" modal (`override` / `import` / `cancel`). Refuses a target not bound to the current git branch (`ignoreBranchBinding`). A 5–25 min run outlives a client timeout — read the outcome with `get_mcp_history`. Driven by `/update1cbase → EDT path` |
 | **infobase_sessions** | List / terminate sessions of a running **standalone-server** infobase (`ibcmd` underneath) | `reachable=false` is not "no sessions"; `terminate` is destructive (`confirm=true`), bulk skips `Designer`; terminate only with the user's consent for those sessions |
 | **create_infobase** / **delete_infobase** / **set_infobase_credentials** | File infobase create / register (incl. `standaloneServer` with a web URL) and stored credentials | Preparing a test infobase; `standaloneServer` + `mode=register` gives an HTTP-testable URL |
-| **export_configuration_to_xml** / **import_configuration_from_xml** | XML dump / import into a **new** EDT project | Interop with a classic Designer-shaped repository |
+| **export_configuration_to_xml** / **import_configuration_from_xml** | XML dump of the **project** / import into a **new** EDT project | Interop with a classic Designer-shaped repository |
+| **export_configuration_to_file** | Dump what the **infobase** holds to `.cf` / `.cfe` through the thick client | Release artifacts, a rollback point before a full update; refused while the infobase is out of date with the project unless `allowOutOfDate=true`; never overwrites; long runs return a `jobId` |
+| **import_project_from_file** | Create a **new** EDT project from `.cf` / `.cfe` (`baseProjectName` required) / `.epf` / `.erf` | Reading a supplier delivery in EDT; needs a local platform with the thick client; background job |
 | **build_external_objects** | Compile an external-objects project to `.epf` / `.erf` | Building external processors / reports |
 | **create_project** / **delete_project** | EDT project lifecycle | Rare; destructive |
 | **get_event_log** | Read a 1C infobase event log **without a running session** by parsing `1Cv8.lgf` + `*.lgp`; filters by period, user, event, severity, comment, metadata, session | The runtime-error source for the systematic-debugging Phase 1. Returns infobase PII — do not paste user data into artifacts |
@@ -104,7 +106,7 @@ No hand-written XML: metadata is created and edited through a typed FQN API that
 | Tool | Purpose |
 |---|---|
 | **launch** / **terminate_launch** / **debug_status** | Start a 1C application in `debug` (default) or `run` mode (`updateBeforeLaunch` applies the DB update first, `restartIfRunning`, `startupOption` for `/C`, external data processor on startup) / stop / inspect; Attach configs debug server-side code |
-| **set_error_breakpoint** | Break on a runtime error instead of a line |
+| **set_error_breakpoint** / **debug_pause** | Break on a runtime error instead of a line / pause a running session |
 | **set_breakpoint** / **remove_breakpoint** / **list_breakpoints** / **wait_for_break** / **step** / **resume** | Breakpoint-debugging controls for the systematic-debugging Phase 3 |
 | **get_variables** / **set_variable** / **evaluate_expression** | Inspect and evaluate in the paused context. **Read-only by default** — never evaluate `Записать()` / `Удалить()` / DML without explicit user consent, and only on a copy infobase |
 | **get_applications** | Infobases bound to the project (id, name, type, update state) — the `applicationId` source |
@@ -171,6 +173,7 @@ Other rulesets and older notes name the classic multi-server distribution's tool
 | `validatequery` | `validate_query` | exact-equivalent (offline, project metadata; `dcsMode` for СКД) |
 | `vcexecutequery` / `vcexecutecode` | `get_applications` → `launch` → `evaluate_expression` | approx — needs a debug session, heavy |
 | `vcloggetlasterror` | `get_event_log` | exact-equivalent (offline) |
+| `db-dump-cf.ps1` / Designer `/DumpCfg` | `export_configuration_to_file` | equivalent (reads the infobase) |
 | `list_graph_projects` / graph `project_id` | `list_projects` / `projectName` | equivalent |
 
 ## Coverage gaps
@@ -181,7 +184,7 @@ Other rulesets and older notes name the classic multi-server distribution's tool
 - **No standalone syntax-only checker for a free-floating snippet.** `write_module_source` syntax-checks what it writes and `validate_query` checks query text, but BSL validation otherwise expects the code to live in a real module of the workspace.
 - **No XSD / raw-XML payload validation.** Metadata correctness is enforced by the typed API plus EDT validation (`revalidate_objects` → `get_project_errors`). Hand-edited `.mdo` / `.form` files are validated the same way, not against a schema.
 - **No live-infobase data service.** Runtime data access goes through a debug/Designer session (`launch` → `evaluate_expression` / `get_variables`) — stateful and heavy. `get_event_log` is the one exception: it reads log files directly, no session needed.
-- **No import directly from a live infobase.** `import_configuration_from_xml` needs an XML dump; `create_project` builds a project from scratch.
+- **No import directly from a live infobase into the current project.** `import_configuration_from_xml` / `import_project_from_file` always create a **new** project (from an XML dump / a `.cf`); pulling infobase changes into the current project goes through `update_database(externalInfobaseChanges='import')`.
 - **No agent-orchestration / QA-scenario tools.** Use the native `Agent` tool and skills; project memory stays on `1c-templates-fastcode` (`remember` / `recall`); YAXUnit tests are written by hand and run with `run_yaxunit_tests`.
 - **Session introspection only for standalone servers.** `infobase_sessions` lists / terminates sessions of a standalone-server infobase; for file and client-server infobases `get_applications`, `list_configurations` and `get_server_status` cover part of it, and lock-conflict diagnosis falls back to the technological log per the locks-and-transactions standard.
 

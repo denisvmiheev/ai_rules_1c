@@ -23,6 +23,8 @@ For a change report (`-getChanges`) or a delta directory (`-configDumpInfoForCha
 **EDT gate:** the dump this command writes is in **Designer XML format**. In a project developed in 1C:EDT (`.dev.env` `USE_EDT=true`) whose working tree is an EDT (`src/**/*.mdo`) workspace, the repository already **is** the source — there is nothing to refresh, and dumping into that tree is wrong. What the user usually means there is one of:
 
 - **The infobase was changed outside EDT** (Designer, `ibcmd`) and those changes must come into the project → `update_database` with `externalInfobaseChanges='import'` (`/update1cbase → EDT path`): it rewrites the **project sources** with the infobase changes. Preview first, get the user's confirmation, and have the working tree committed or stashed so the import is a reviewable diff.
+- **A binary copy of what the infobase holds** (release, support snapshot) → `export_configuration_to_file` (`.cf` / `.cfe`, `edt-mcp`); it never overwrites an existing file.
+- **A supplier `.cf` / `.cfe` or an `.epf` / `.erf` to read in EDT** → `import_project_from_file` creates a **new** project (a `.cfe` needs `baseProjectName`); never into the current one.
 - **A Designer XML copy is needed** (hand-off, a classic tool) → dump into a **separate** directory with the steps below and state that the result is a dump, not the workspace; `import_configuration_from_xml` creates a **new** EDT project and is never run silently (`content/rules/edt-workflow.md`).
 
 ## Step 0. Check `.dev.env` parameters
