@@ -2,7 +2,7 @@
 name: 1c-validate
 description: "Validate changed 1C artifacts — BSL and metadata by EDT markers, query text against the project's metadata, the ITS clause behind a finding — within the verification-policy budget. Use after every BSL or metadata edit."
 argument-hint: "<module path | object FQN> [severity]"
-allowed-tools: mcp__edt-mcp__list_projects, mcp__edt-mcp__write_module_source, mcp__edt-mcp__revalidate_objects, mcp__edt-mcp__validate_query, mcp__edt-mcp__get_project_errors, mcp__edt-mcp__get_check_description, mcp__edt-mcp__get_problem_summary, mcp__edt-mcp__resync_to_disk, mcp__edt-mcp__apply_quick_fix, mcp__v8std-local__v8std_explain_diagnostics, mcp__v8std-local__v8std_get_page
+allowed-tools: mcp__edt-mcp__list_projects, mcp__edt-mcp__write_module_source, mcp__edt-mcp__revalidate_objects, mcp__edt-mcp__validate_query, mcp__edt-mcp__get_project_errors, mcp__edt-mcp__get_check_description, mcp__edt-mcp__get_problem_summary, mcp__edt-mcp__resync_to_disk, mcp__edt-mcp__apply_quick_fix, mcp__edt-mcp__validate_form_model, mcp__v8std-local__v8std_explain_diagnostics, mcp__v8std-local__v8std_get_page
 ---
 
 # 1c-validate — the validator chain
@@ -20,6 +20,7 @@ Every call takes `projectName` (`list_projects`); take exact parameter names fro
 | 2 Logic & performance | `get_project_errors` (`severity` BLOCKER / CRITICAL / MAJOR, `objects=[FQNs]`) + `get_check_description` | `ql-*` query checks, `begin-transaction`, standards checks; read what a check means before fixing or dismissing it |
 | 3 Style | `get_project_errors` (MINOR / TRIVIAL) → `get_problem_summary` | Confirming totals pass; nothing worse than the pre-change baseline |
 | 5 Metadata | `revalidate_objects` → `get_project_errors` on the changed FQNs | There is no XSD / raw-XML validator; EDT validation of the loaded model is the check |
+| 5 Form structure | `validate_form_model` (one form FQN) | Computed from the model **now** (unlike `get_project_errors`): broken data paths, buttons without commands, handlers without procedures, duplicate ids |
 | Auto-fix | `apply_quick_fix` | Applies EDT's official fix to **one** marker; a code change like any other — re-validate afterwards |
 | ITS rationale for a check id | `v8std_explain_diagnostics` (+ `v8std_get_page`) on `v8std-local` | When `get_check_description` alone is unclear or a review needs the ITS citation |
 

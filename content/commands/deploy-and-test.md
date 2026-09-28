@@ -24,7 +24,7 @@ When substituting `.dev.env` values into the templates below, resolve `{INFOBASE
 
 Before running, inherit `/update1cbase`'s source-identity, completeness and selection preflight for every chosen target. A `Configuration.xml` somewhere under `EXPORT_PATH` alone is insufficient, and a partial dump cannot feed a full deployment.
 
-**EDT gate:** when `.dev.env` `USE_EDT=true`, the same source-format check as `/update1cbase` applies — Steps 2–3 load a Designer XML dump, not an EDT `src/**/*.mdo` tree, and only one deployment owner (this command **or** EDT's `update_database`) may act on the infobase in a run. Canon — `content/rules/edt-workflow.md`.
+**EDT gate:** when `.dev.env` `USE_EDT=true` and the working tree is an EDT workspace (`src/**/*.mdo`), Steps 1–3 are replaced by `/update1cbase → EDT path` (E0–E5 in `content/commands/update1cbase.md`, `update_database` preview → `confirm=true`); stop on its failure, otherwise continue at Step 4. Steps 1–3 below load a Designer XML dump. One deployment owner per run. Canon — `content/rules/edt-workflow.md`.
 
 This command uses forced session termination while applying the DB configuration. The target must be an explicitly identified dev/test infobase: `.dev.env` `INFOBASE_ROLE=dev|test` identifies it, `prod` refuses the deploy steps (canon `content/rules/dev-standards-env.md → INFOBASE_ROLE`). If the role is empty and the current context does not establish it, stop before Step 3 and ask the user to confirm the target; never infer that an arbitrary `.dev.env` points to a test base.
 

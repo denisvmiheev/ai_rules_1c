@@ -40,7 +40,7 @@ Hard rules for the EDT format:
 
 In order of preference:
 
-1. **EDT-MCP, when exposed** — `create_metadata`, `modify_metadata`, `delete_metadata`, `rename_metadata_object`, `adopt_metadata_object` (borrowing a base object into an extension), `write_module_source` for module code. EDT owns the model, so EDT performs the change. This is the EDT-format equivalent of the `1c-metadata-manage` hard gate, and it carries the same reporting duty.
+1. **EDT-MCP, when exposed** — `create_metadata`, `modify_metadata`, `delete_metadata`, `rename_metadata_object`, `adopt_metadata_object` (borrowing a base object into an extension), `dcs` for report schemas / variants and form dynamic lists, `write_module_source` for module code. EDT owns the model, so EDT performs the change. This is the EDT-format equivalent of the `1c-metadata-manage` hard gate, and it carries the same reporting duty.
 2. **The EDT UI, by the user** — when EDT-MCP is absent, hand the user a precise, ordered instruction (object, properties, exact names) instead of editing files. Slower for the user, but it is the only correct path left inside EDT format.
 3. **Export → XML toolchain → import** — only when the change genuinely requires the XML tools and the user accepts the round trip. `export_configuration_to_xml` produces a Designer dump; work on it with `1c-metadata-manage`; bring it back with the platform / EDT import path. **Confirm first:** `import_configuration_from_xml` creates a **new** EDT project rather than updating the current one, so an unconfirmed round trip can strand the workspace. Never start this silently to route around option 1 or 2.
 
@@ -80,7 +80,7 @@ What changes:
 - **There is no XSD / raw-XML validator for MDO (Gate 5).** Use EDT's validation: `revalidate_objects` → `get_project_errors` / `get_problem_summary` on the changed FQNs. In `auto`/`off` without MCP, request the corresponding validation in EDT by the user, bound to the current saved state; until results arrive it is unverified. `required` remains blocked without its tool evidence. Report the actual source of validation.
 - **`apply_quick_fix`** applies EDT's official auto-fix to **one** marker. Apply deliberately, one at a time, and re-validate — it is a code change like any other, not a formatting nicety. `get_check_description` explains what a check code actually means before you "fix" it.
 - **Budget discipline is unchanged** (`AGENTS.md → MCP Tool Calling → B.1`): re-validating unchanged state is forbidden, and EDT markers do not open a new retry loop of their own.
-- `validate_query` (EDT-MCP) checks query text against the **project's metadata** — syntax and semantic errors with line numbers, without touching an infobase. It satisfies Gate 3a's query branch: EDT resolves tables and fields against the project's metadata, while what the live base returns needs a debug session (`debug_launch` → `evaluate_expression`). State which one produced the evidence.
+- `validate_query` (EDT-MCP) checks query text against the **project's metadata** — syntax and semantic errors with line numbers, without touching an infobase. It satisfies Gate 3a's query branch: EDT resolves tables and fields against the project's metadata, while what the live base returns needs a debug session (`launch` → `evaluate_expression`). State which one produced the evidence.
 
 ## DB update, launches, external objects
 
@@ -105,7 +105,7 @@ What changes:
 
 - EDT-MCP includes filesystem, code-writing, database-update and debug operations, and treats every connected client as fully trusted. Keep it bound to loopback; a non-loopback bind requires an auth token and a trusted network (`/install-edt-mcp`, step 3).
 - Operations EDT-MCP classifies as **destructive** — `delete_metadata`, `rename_metadata_object`, `delete_project`, `delete_infobase`, `update_database`, and `modify_metadata` when it changes a data type — prompt for consent by default. That prompt is a feature: it is the user's decision point, not an obstacle. **Never** disable it on the user's behalf (the `EDT_MCP_DESTRUCTIVE_CONSENT=allow` override, or the "Allow all" consent level) — propose it only if the user asks for unattended automation, and say what it removes.
-- Debug and profiling tools (`debug_launch`, `set_breakpoint`, `start_profiling`, …) act on a running application. Confirm the target is a dev / test base first, exactly as the deployment commands require.
+- Debug and profiling tools (`launch`, `set_breakpoint`, `start_profiling`, …) act on a running application. Confirm the target is a dev / test base first, exactly as the deployment commands require.
 
 ## Reporting
 

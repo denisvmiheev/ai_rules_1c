@@ -18,7 +18,7 @@ This server is **conditional** in the sense that it exists only on a workstation
 
 ## Toolsets
 
-`core`, `metadata`, `code`, `debug`, `testing`, `profiling`, `forms`, `tags`, `translation`, `project`. Composition follows the installed plugin version — `list_toolsets` is authoritative when this file and the session disagree.
+`core`, `metadata`, `code`, `debug`, `testing`, `profiling`, `forms`, `tags`, `translation`, `project`, `comparison`, `git`. Composition follows the installed plugin version — `list_toolsets` is authoritative when this file and the session disagree. Besides progressive disclosure, individual tools can be switched off in EDT Preferences → MCP Server → Tools (the `git` tool is off by default; debug / profiling tools may be too): a tool listed by `list_toolsets` but absent from `tools/list` is disabled there, not missing. This catalog describes plugin 2.17.
 
 ## Core — discovery and reading
 
@@ -56,14 +56,15 @@ No hand-written XML: metadata is created and edited through a typed FQN API that
 | Tool | Purpose | Notes |
 |---|---|---|
 | **create_metadata** | Create a top object (`Catalog.Products`) or a member (`Catalog.Products.Attribute.Weight`, `InformationRegister.Prices.Dimension.Product`, `Enum.Colors.EnumValue.Red`, form items / attributes / commands / handlers) | Common-module flag presets (`commonModuleKind`, `serverCall`, `privileged`, `returnValuesReuse`); form creation with `generateContent` / `objectFields` / `setAsDefault`; `callType` (`Before`/`After`/`Instead`) for **extension** event interception; `normalizeYo` normalizes «ё» in names |
-| **modify_metadata** | Set properties of an object / member; move-reorder form items (`parent`, `position`); rebind a form handler (`procedure`); set a dynamic-list `queryText`; author a **Role** (`rights`, `templates`, `roleProperties`, incl. RLS); author a **report's DCS** (`dcs`); author a **spreadsheet template** (`template`: cells, merges, areas, widths); edit membership lists (`content`: common-attribute owners, exchange-plan content, catalog owners, document register records, subsystem content) | This single tool covers role / SKD / MXL / interface authoring |
+| **dcs** | Read and author a report's **DCS schema**, its settings variants, form conditional appearance and form **dynamic lists** as one root plus an optional `#/...` fragment: data sets, fields, parameters, calculated / total fields, variants, groupings, filters, order, user fields; lossless XML round-trip for the whole schema | `action='get'` first — its hash is `expectedHash` for `replace` / `remove` / index-addressed edits; `action='options'` lists the writable vocabulary; charts and nested data sets only through the XML channel |
+| **modify_metadata** | Set properties of an object / member; move-reorder form items (`parent`, `position`); rebind a form handler (`procedure`); set a dynamic-list `queryText`; author a **Role** (`rights`, `templates`, `roleProperties`, incl. RLS); author a **spreadsheet template** (`template`: cells, merges, areas, widths); edit membership lists (`content`: common-attribute owners, exchange-plan content, catalog owners, document register records, subsystem content) | This single tool covers role / SKD / MXL / interface authoring |
 | **delete_metadata** | Delete an object or member, cascading reference cleanup | Two-phase: preview, then `confirm=true`; blocked on un-cleanable references unless `force=true` |
 | **rename_metadata_object** | Rename with cascade across BSL, forms, metadata | Two-phase preview → `confirm=true`; `disableIndices` skips optional change points |
 | **adopt_metadata_object** | Adopt a base object / member into a configuration **extension** (EDT "Add To Extension") | Adopting BSL methods is **not** covered |
 | **list_subsystems** / **get_subsystem_content** | Subsystem tree and its content | Placing new objects into subsystems |
 | **get_configuration_properties** | Configuration-level properties (compatibility mode, name, …) | Confirm the platform version instead of trusting memory |
 | **list_common_pictures** / **export_common_picture** | Common-picture inventory and export | Icons for forms / commands |
-| **list_configurations** / **create_launch_config** / **delete_launch_config** | EDT launch configurations (runtime client / Attach) with running state | Discovery step before `debug_launch`, `run_yaxunit_tests`, `update_database` |
+| **list_configurations** / **create_launch_config** / **delete_launch_config** | EDT launch configurations (runtime client / Attach) with running state | Discovery step before `launch`, `run_yaxunit_tests`, `update_database` |
 
 ## Project — validation, DB update, logs
 
@@ -76,7 +77,8 @@ No hand-written XML: metadata is created and edited through a typed FQN API that
 | **get_markers** | Bookmarks and TODO / FIXME / XXX / HACK task markers | Technical-debt inventory (`TODO No.<task>:` per the code-style standard) |
 | **clean_project** | DISK → MODEL full rebuild + revalidation | Slow; discards unsaved in-memory model edits. Prefer `revalidate_objects` for one object |
 | **resync_to_disk** | MODEL → DISK: export missing `.mdo`, report / clean dangling `Configuration.mdo` references | Fixes "object file does not exist" and `md-reference-intergrity` failures that block `update_database` |
-| **update_database** | Apply the configuration to an infobase, full or incremental | Two-phase: call without `confirm` for a preview, then `confirm=true`. Auto-terminates 1C clients this EDT launched. Driven by `/update1cbase` |
+| **update_database** | Apply the configuration to an infobase, full or incremental | Two-phase: call without `confirm` for a preview, then `confirm=true`. Auto-terminates 1C clients this EDT launched; refuses while a non-agent standalone-server session is open (`checkInfobaseSessions`); `externalInfobaseChanges` answers the "changed outside EDT" modal (`override` / `import` / `cancel`). A 5–25 min run outlives a client timeout — read the outcome with `get_mcp_history`. Driven by `/update1cbase → EDT path` |
+| **infobase_sessions** | List / terminate sessions of a running **standalone-server** infobase (`ibcmd` underneath) | `reachable=false` is not "no sessions"; `terminate` is destructive (`confirm=true`), bulk skips `Designer`; terminate only with the user's consent for those sessions |
 | **create_infobase** / **delete_infobase** / **set_infobase_credentials** | File infobase create / register (incl. `standaloneServer` with a web URL) and stored credentials | Preparing a test infobase; `standaloneServer` + `mode=register` gives an HTTP-testable URL |
 | **export_configuration_to_xml** / **import_configuration_from_xml** | XML dump / import into a **new** EDT project | Interop with a classic Designer-shaped repository |
 | **build_external_objects** | Compile an external-objects project to `.epf` / `.erf` | Building external processors / reports |
@@ -90,6 +92,7 @@ No hand-written XML: metadata is created and edited through a typed FQN API that
 
 | Tool | Purpose | When to use |
 |---|---|---|
+| **validate_form_model** | Structural check of ONE managed form computed from the model **now**: duplicate names / ids, a data path to no attribute, a button with no command, a handler with no procedure or event, missing extInfo, several main attributes | Right after a form change — current where `get_project_errors` reports what EDT validated earlier; changes nothing |
 | **get_form_layout_snapshot** | YAML snapshot of the calculated WYSIWYG layout (bounds, element types, display properties) | Inspect or diff what a form actually renders |
 | **get_form_screenshot** | PNG of the form's WYSIWYG editor | Visual check of a layout change |
 | **get_template_screenshot** | PNG of a spreadsheet template | Visual check of an MXL layout |
@@ -100,7 +103,8 @@ No hand-written XML: metadata is created and edited through a typed FQN API that
 
 | Tool | Purpose |
 |---|---|
-| **debug_launch** / **terminate_launch** / **debug_status** | Start (`restartIfRunning`, `updateBeforeLaunch`) / stop / inspect a debug session; Attach configs debug server-side code |
+| **launch** / **terminate_launch** / **debug_status** | Start a 1C application in `debug` (default) or `run` mode (`updateBeforeLaunch` applies the DB update first, `restartIfRunning`, `startupOption` for `/C`, external data processor on startup) / stop / inspect; Attach configs debug server-side code |
+| **set_error_breakpoint** | Break on a runtime error instead of a line |
 | **set_breakpoint** / **remove_breakpoint** / **list_breakpoints** / **wait_for_break** / **step** / **resume** | Breakpoint-debugging controls for the systematic-debugging Phase 3 |
 | **get_variables** / **set_variable** / **evaluate_expression** | Inspect and evaluate in the paused context. **Read-only by default** — never evaluate `Записать()` / `Удалить()` / DML without explicit user consent, and only on a copy infobase |
 | **get_applications** | Infobases bound to the project (id, name, type, update state) — the `applicationId` source |
@@ -113,6 +117,16 @@ No hand-written XML: metadata is created and edited through a typed FQN API that
 | Tool | Purpose |
 |---|---|
 | **get_tags** / **get_objects_by_tags** | Tag-based object discovery — find comparable existing objects / forms as examples |
+
+## Comparison — three-way, read-only
+
+| Tool | Purpose |
+|---|---|
+| **compare_configurations** | Compare the working tree against two git revisions (three-way) and list differing top objects — a background job (`get_job_status`); one comparison at a time, a finished one keeps the slot until released with `releaseComparisonId` |
+| **get_comparison_node** | Expand one object of a comparison: three-way property table, form structure, module sections, support state |
+| **merge_rules** | Read / author EDT's merge-rules file. Never merges — running the merge stays a human action in EDT's comparison window |
+
+Use for reviewing a branch or a vendor-update merge before a human merges it in EDT.
 | **generate_translation_strings** / **translate_configuration** / **get_translation_project_info** | LanguageTool-based configuration translation (extract, translate, project info) |
 
 ## Which server first
@@ -146,7 +160,8 @@ Other rulesets and older notes name the classic multi-server distribution's tool
 | `get_object_dossier` / `get_metadata_details` / `resolve_qualified_name` | `get_metadata_details` | exact-equivalent (also covers roles and forms) |
 | `trace_impact` / `graph_dependencies` / `find_usages_of_object` / `find_objects_using_object` / `find_register_movement_docs` | `find_references` (+ `get_method_call_hierarchy`) | approx — single hop, no transitive graph |
 | `trace_call_chain` / `get_method_call_hierarchy` | `get_method_call_hierarchy` | exact-equivalent (+ `outgoing`) |
-| `search_forms` / `inspect_form_layout` / `get_form_artifact` / `get_form_structure` | `get_objects_by_tags` (comparable forms), `get_metadata_details` (form FQN), `get_form_layout_snapshot`, `get_form_screenshot` | equivalent, richer |
+| `search_forms` / `inspect_form_layout` / `get_form_artifact` / `get_form_structure` | `get_objects_by_tags` (comparable forms), `get_metadata_details` (form FQN), `get_form_layout_snapshot`, `get_form_screenshot`; structural check — `validate_form_model` | equivalent, richer |
+| `dcs_manage` / DCS XML editing | `dcs` | equivalent |
 | `get_xsd_schema` / `verify_xml` | typed `create_metadata` / `modify_metadata` + `revalidate_objects` → `get_project_errors` | **architecturally different** — see gaps |
 | `syntaxcheck` / `syntaxcheck_file` | pre-write check of `write_module_source` + `revalidate_objects` → `get_project_errors` | equivalent (two steps: refresh, then read markers) |
 | `check_1c_code` / `review_1c_code` | `get_project_errors` → `get_check_description` / `get_problem_summary` | approx — rule-based, no AI review |
@@ -154,7 +169,7 @@ Other rulesets and older notes name the classic multi-server distribution's tool
 | `its_help` / `fetch_its` | `v8std_search` / `v8std_explain_diagnostics` / `v8std_get_page` on `v8std-local` | equivalent |
 | `helpsearch` | `docsearch` / `docinfo` on `1C-docs-mcp`; `get_platform_documentation` | equivalent |
 | `validatequery` | `validate_query` | exact-equivalent (offline, project metadata; `dcsMode` for СКД) |
-| `vcexecutequery` / `vcexecutecode` | `get_applications` → `debug_launch` → `evaluate_expression` | approx — needs a debug session, heavy |
+| `vcexecutequery` / `vcexecutecode` | `get_applications` → `launch` → `evaluate_expression` | approx — needs a debug session, heavy |
 | `vcloggetlasterror` | `get_event_log` | exact-equivalent (offline) |
 | `list_graph_projects` / graph `project_id` | `list_projects` / `projectName` | equivalent |
 
@@ -165,16 +180,16 @@ Other rulesets and older notes name the classic multi-server distribution's tool
 - **ITS-standards search / fetch — covered by `v8std-local`, not by `edt-mcp` itself.** `docsearch` / `docinfo` and `get_platform_documentation` cover platform APIs; `v8std-local` covers ITS methodology standards and their diagnostic mapping. Only when `v8std-local` is not exposed in the session does the old caveat apply — say so explicitly and treat an ITS claim as unverified.
 - **No standalone syntax-only checker for a free-floating snippet.** `write_module_source` syntax-checks what it writes and `validate_query` checks query text, but BSL validation otherwise expects the code to live in a real module of the workspace.
 - **No XSD / raw-XML payload validation.** Metadata correctness is enforced by the typed API plus EDT validation (`revalidate_objects` → `get_project_errors`). Hand-edited `.mdo` / `.form` files are validated the same way, not against a schema.
-- **No live-infobase data service.** Runtime data access goes through a debug/Designer session (`debug_launch` → `evaluate_expression` / `get_variables`) — stateful and heavy. `get_event_log` is the one exception: it reads log files directly, no session needed.
+- **No live-infobase data service.** Runtime data access goes through a debug/Designer session (`launch` → `evaluate_expression` / `get_variables`) — stateful and heavy. `get_event_log` is the one exception: it reads log files directly, no session needed.
 - **No import directly from a live infobase.** `import_configuration_from_xml` needs an XML dump; `create_project` builds a project from scratch.
 - **No agent-orchestration / QA-scenario tools.** Use the native `Agent` tool and skills; project memory stays on `1c-templates-fastcode` (`remember` / `recall`); YAXUnit tests are written by hand and run with `run_yaxunit_tests`.
-- **No session / lock / process introspection.** `get_applications`, `list_configurations`, `get_server_status` and the `webUrl` returned by `create_infobase(applicationKind='standaloneServer')` cover part of it; lock-conflict diagnosis falls back to the technological log per the locks-and-transactions standard.
+- **Session introspection only for standalone servers.** `infobase_sessions` lists / terminates sessions of a standalone-server infobase; for file and client-server infobases `get_applications`, `list_configurations` and `get_server_status` cover part of it, and lock-conflict diagnosis falls back to the technological log per the locks-and-transactions standard.
 
 ## Safety and discipline
 
 - **Destructive operations require consent by default** — `delete_metadata`, `rename_metadata_object`, `delete_project`, `delete_infobase`, `update_database`, and `modify_metadata` when it changes a data type. The prompt is the user's decision point. Never disable it on the user's behalf: the "Allow all" consent level and the `EDT_MCP_DESTRUCTIVE_CONSENT=allow` override are for unattended automation the user explicitly asked for, and you must say what they remove.
 - **Full trust surface.** The server exposes filesystem, code-writing, DB-update and debug operations to every connected client. Loopback binding is the default and should stay; a non-loopback bind requires an auth token and a trusted network. Never print or commit that token.
 - **The model is the authority, the disk lags.** `resync_to_disk` flushes model → disk and reports desync. Reconcile before mixing `edt-mcp` with file-level tools, and never alternate owners on one artifact — canon: `content/rules/edt-workflow.md → Model vs disk — the synchronization rule`.
-- **Debug / profiling / `update_database` act on a real application.** Confirm the target is a dev / test base first, exactly as the deployment slash commands require.
+- **Debug / profiling / `launch` / `update_database` / `infobase_sessions terminate` act on a real application.** Confirm the target is a dev / test base first, exactly as the deployment slash commands require.
 - **`import_configuration_from_xml` creates a new project**, it does not update the current one. Confirm with the user before any export/import round trip.
 - **Budget rules are unchanged** (`content/rules/mcp-policy.md` section C): no repeated calls against unchanged state, and EDT markers do not open a retry loop of their own. `get_mcp_history` shows what this session already asked — use it instead of re-running a call to remember its result.

@@ -57,7 +57,7 @@ These switches select execution paths, never waive hard gates. `auto`/`off` fall
 | `md-reference-intergrity` "lost reference" finding, «object file does not exist» | edt | Desync symptom: `resync_to_disk`, report first; `cleanDanglingReferences=true` only for confirmed garbage |
 | `get_check_description` configuration error | edt | Check-descriptions folder is not set: `get_server_status` confirms the flag; keep the finding without the explanation |
 | Blank `get_form_screenshot` / `get_template_screenshot` | edt | Missing JVM flag `-DnativeFormBufferedLayoutRender=true` (`get_server_status`), not a bad call |
-| Destructive-consent prompt (`delete_metadata`, `rename_metadata_object`, `update_database`, …) | edt | The user's decision point: preview first, confirm only with the user; never lower the consent level |
+| Destructive-consent prompt (`delete_metadata`, `rename_metadata_object`, `update_database`, `infobase_sessions`, …); `update_database` answers — `/update1cbase → EDT path` | edt | The user's decision point: preview first, confirm only with the user; never lower the consent level |
 | `outcome: "unavailable"`, `status: degraded`, `generation: uninitialized` | docs | The index is not built or failed: report once, treat dependent standards / API facts as unverified; never wait in a loop |
 | `not_found`, `outcome: "not_found"`, empty result with a ready generation | docs, ssl, v8std, edt | A finished negative answer: reformulate once if wording can help, then the next lane; with no freshness evidence report «inconclusive», not «absent» |
 | `ambiguous_name` with candidates | ssl, docs | Refine by signature or fetch the intended `doc_id`; never pick an overload silently |

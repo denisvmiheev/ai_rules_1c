@@ -101,7 +101,7 @@ Same gate: forms are created or changed through the skill (`docs/form-manage.md`
 
 1. `get_objects_by_tags` — similar existing forms; `get_metadata_details` (form FQN) / `get_form_layout_snapshot` — their structure (elements, bindings, commands, events).
 2. `get_metadata_objects` — objects for references.
-3. The skill's form operations; `revalidate_objects` + `get_project_errors`; `get_form_layout_snapshot` to confirm the layout; fix and re-validate.
+3. The skill's form operations; `validate_form_model` → `revalidate_objects` + `get_project_errors`; `get_form_layout_snapshot` to confirm the layout; fix and re-validate.
 
 ## Integrations
 

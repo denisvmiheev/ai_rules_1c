@@ -2,7 +2,7 @@
 name: 1c-live-ib
 description: "Answer what only the running infobase knows — what the event log recorded, does a query parse, what an expression returns on real data — via edt-mcp (offline event log; debug session for live evaluation). Read-only by default; any mutation needs explicit user consent and a copy infobase."
 argument-hint: "<lasterror | query text | expression>"
-allowed-tools: mcp__edt-mcp__list_projects, mcp__edt-mcp__get_event_log, mcp__edt-mcp__validate_query, mcp__edt-mcp__get_applications, mcp__edt-mcp__list_configurations, mcp__edt-mcp__debug_launch, mcp__edt-mcp__debug_status, mcp__edt-mcp__evaluate_expression, mcp__edt-mcp__get_variables, mcp__edt-mcp__terminate_launch
+allowed-tools: mcp__edt-mcp__list_projects, mcp__edt-mcp__get_event_log, mcp__edt-mcp__validate_query, mcp__edt-mcp__get_applications, mcp__edt-mcp__list_configurations, mcp__edt-mcp__launch, mcp__edt-mcp__debug_status, mcp__edt-mcp__evaluate_expression, mcp__edt-mcp__get_variables, mcp__edt-mcp__terminate_launch
 ---
 
 # 1c-live-ib — the running infobase
@@ -16,7 +16,7 @@ Escalate here only when the configuration, the static validators and the docs ca
 | Last / recent error of the infobase | `get_event_log` | Reads `1Cv8.lgf` + `*.lgp` **offline** — no running session; filter by period, user, severity, event / comment / metadata substring, session. Returns infobase PII: quote only what the diagnosis needs |
 | Does a query parse and resolve | `validate_query` | Offline, against the project's metadata; `dcsMode` for СКД — run it before any live evaluation |
 | Which infobase / launch target | `get_applications`, `list_configurations` | The `applicationId` source; confirm it is a dev / test base |
-| What an expression / query returns on real data | `debug_launch` → `wait_for_break` → `evaluate_expression` (+ `get_variables`) → `terminate_launch` | Needs an active debug session: stateful and heavy — use only when static checks cannot answer |
+| What an expression / query returns on real data | `launch` → `wait_for_break` → `evaluate_expression` (+ `get_variables`) → `terminate_launch` | Needs an active debug session: stateful and heavy — use only when static checks cannot answer |
 
 ## Safety
 

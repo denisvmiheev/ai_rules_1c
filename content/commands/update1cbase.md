@@ -35,13 +35,43 @@ Parameters, classes and defaults — `content/rules/dev-standards-env.md §1`; D
 - `prod` — do not run Steps 2–3 against it. Hand the user the exact commands with the production overrides (no forced termination: `--session-terminate=prompt`, or omit `-SessionTerminate`; an agreed update window; a verified backup first) and stop.
 - empty — if the current context does not establish the role, stop before Step 3 and ask the user to confirm the target. Never infer that an arbitrary `.dev.env` points to a test base.
 
-**EDT gate:** when `.dev.env` `USE_EDT=true`, establish the source format before running. This command loads a **Designer XML dump**; it cannot load an EDT (`src/**/*.mdo`) tree. In an EDT-format project either produce a dump first (`export_configuration_to_xml`) or let EDT apply the change (`update_database`) — and keep **one deployment owner per run**, named in the `IB tooling:` line. Canon — `content/rules/edt-workflow.md → DB update, launches, external objects`.
+**EDT gate:** when `.dev.env` `USE_EDT=true`, establish the source format before running. An EDT workspace (`src/**/*.mdo`) goes through **EDT path** below instead of Steps 1–3; a Designer XML dump in the tree keeps Steps 1–3. Keep **one deployment owner per run**, named in the `IB tooling:` line. Canon — `content/rules/edt-workflow.md → DB update, launches, external objects`.
 
 **Repository gate:** when `REPOSITORY_PATH` is non-empty, the target infobase is bound to a configuration repository — the objects being loaded must be **locked in the repository first** (`1c-repository-manage` skill, process — its `docs/repo-sdlc.md`); otherwise the load fails or silently skips read-only objects. A "configuration is read-only / object locked" line in the load/update log routes to that skill, not into the retry loop below. **Never unbind** the configuration from the repository to make the load proceed. Before Step 2, run the freshness check (`repo-sdlc.md → Source files follow the infobase`). If an object of the load list changed in the infobase after its files were exported, the load is blocked: loading it would silently overwrite a teammate's committed change.
 
 When substituting `.dev.env` values into the templates below, resolve `{INFOBASE_FLAG}` once from the effective `INFOBASE_KIND` (`/F` for `file`, `/S` for `server`; reject any other value), and substitute resolved `{LOG_PATH}` / `{RESULT_PATH}` values that contain `$env:` double-quoted — single quotes do not expand it. Delete a stale `{RESULT_PATH}` file before every Designer launch.
 
 Before running, resolve the source directory for the selected main configuration / extension. Full mode requires a complete dump with `Configuration.xml`; partial mode requires a non-empty validated file list in the matching format and a suitable existing target configuration. Check source completeness and dependencies; never infer a full snapshot from the presence of `Configuration.xml` alone. Preserve the existing `ConfigDumpInfo.xml` before the load changes it; after a failed load / apply it is not evidence of a synchronized database.
+
+## EDT path (`USE_EDT=true`, sources in EDT format)
+
+Use this path instead of Steps 1–3 when `.dev.env` `USE_EDT=true` **and** the working tree is an EDT workspace (`.project` + `DT-INF/` + `src/Configuration/Configuration.mdo`). EDT applies its own model to the infobase: no export directory, no `/LoadConfigFromFiles`, no `ibcmd`. Tools: `edt-mcp` — `list_configurations` / `get_applications` (target), `infobase_sessions` (who holds the base), `update_database` (preview, then apply). Take exact parameter names from the live schema; `get_tool_guide('update_database')` is the extended how-to. `PLATFORM_PATH`, `EXPORT_PATH` and `IBCMD_CONFIG` are not used on this path. Load scope (`full` / `partial` / `git`) does not apply either — EDT decides what changed; `fullUpdate=true` is the only knob.
+
+**E0. Parameters.** Only `INFOBASE_PATH` is blocking — ask once if empty and write the answer back to `.dev.env`. `IB_USER` / `IB_PASSWORD` are Defaulted: never ask up front, store them into the target with `set_infobase_credentials` only when `update_database` reports an authentication failure. The target must be an explicitly identified dev / test infobase (`INFOBASE_ROLE`); on `prod` stop and hand the user the commands instead.
+
+**E1. Resolve the target.** Confirm `projectName` with `list_projects`. Pick **one** target and keep it for the whole run: a runtime-client `launchConfigurationName` from `list_configurations` (preferred), or `projectName` + `applicationId` from `get_applications`. An `applicationId` shaped `launch:<name>` / `attach:<name>` from `list_configurations` is a launch id, not an application — pass the entry's `name` as `launchConfigurationName`. An **extension** project has no applications of its own: target the application of its base configuration project. If the infobase from `.dev.env` is not registered in the workspace, register it once with `create_infobase(mode='register')`.
+
+**E2. Pre-flight.**
+
+- Reconcile the model with the disk first (`resync_to_disk`) when the tree was changed outside EDT (git checkout, a script); then `revalidate_objects` + `get_project_errors` — `ERRORS` / `BLOCKER` findings, especially `md-reference-intergrity` "lost reference", block the update and are fixed before it (`content/rules/edt-workflow.md → Model vs disk`).
+- Standalone-server application (`applicationId` starting with `ServerApplication.`): `infobase_sessions(action='list')`. `reachable=true` with `sessions=[]` proves the base is free; `reachable=false` proves nothing. Any non-agent session blocks the update. Terminating sessions (`action='terminate'`, `confirm=true`) ends other people's work — do it **only** with the user's explicit consent for those sessions; never terminate a `Designer` session in bulk. For file / client-server applications this tool does not apply.
+
+**E3. Preview, then apply.** `update_database` is destructive and two-phase:
+
+1. Call it **without `confirm`**: it resolves the target and reports `updateType` and `stateBefore`, changing nothing. Read the preview.
+2. Call it with `confirm=true` (`fullUpdate=true` only when an incremental update is genuinely insufficient). Defaults to keep: `terminateRunningClients=true` (terminates only the 1C clients **this EDT launched**), `checkInfobaseSessions=true`, `standaloneServerPortConflict='cancel'`.
+3. `externalInfobaseChanges` answers EDT's "Infobase configuration changes" modal when the infobase was changed **outside EDT** (Designer, `ibcmd`): `override` (default) makes the project win and discards those changes, `import` rewrites the **project sources** with them, `cancel` aborts. `override` is right for a dev / test base the project owns; if the user may have changed the base in Designer on purpose — ask before applying, and never choose `import` without the user (it rewrites the working tree; commit or stash first).
+
+Read the result in full: success is `stateAfter = UPDATED`. A large configuration can take 5–25 minutes. If the client call times out, the EDT job **keeps running** — do not retry blindly; read the outcome with `get_mcp_history(tool='update_database', limit=1)`. A retry while the first run is alive fails with "Application is currently being updated".
+
+**E4. Retry loop** — the Update retry loop below applies unchanged in spirit, with these EDT specifics:
+
+- "object file does not exist" / `md-reference-intergrity` → `resync_to_disk` (report first; `cleanDanglingReferences=true` only for confirmed orphans), `revalidate_objects`, retry.
+- Exclusive lock → with the defaults the EDT-launched client is already terminated; a lock held by an external Designer / client is the user's — report it, never force it. On a standalone server a blocking session is named by the preflight; handle it per E2.
+- "Отсутствует внутренняя информация (узел InternalInfo) для объекта Configuration" is an EDT platform-pipeline limitation, not a defect of the sources. Workaround with the user's agreement: `export_configuration_to_xml` into a separate directory, then the Designer path above (Steps 1–3) against that dump — one deployment owner per run.
+- 3 full attempts, then stop and report.
+
+**E5. Report.** Target (launch configuration or project + application), `updateType`, `stateBefore` → `stateAfter`, attempts and what was fixed between them, sessions found / terminated with consent. Lines: `IB tooling: /update1cbase (EDT path)`, `EDT tooling: <tools used>`.
 
 ## Step 1. Choose tool: `ibcmd` or Designer
 
