@@ -9,14 +9,16 @@ category: forms
 This file is the **router** for managed-form work. Load it first, then load only the companion rules selected by the table below — companion files are not auto-attached by file pattern.
 
 > **Execution gate.** Companion rules define *what* a correct form looks like; the *mutation* of `Form.xml` / layouts itself goes through the **`1c-metadata-manage`** skill (`content/skills/1c-metadata-manage/docs/form-manage.md`, form-compile DSL) or the `1c-metadata-manager` subagent — hard gate per `AGENTS.md → Skills and Subagents`, exceptions only per the skill's `SKILL.md → Hard rule`. Editing `Form.Module.bsl` logic is regular BSL work and is not covered by this gate.
+>
+> **Typical forms are excluded from that path.** A managed form of the vendor configuration is never mutated declaratively (`Form.xml` / `Form.form`, skill tools, EDT-MCP form members, form editor) — only programmatically through the `РедакторФорм` library: `forms-add.md → Programmatic Modification of Typical Forms — hard rule`.
 
 ## Routing
 
 | Task | Load |
 |---|---|
 | Design a form layout from scratch, or when requirements do not specify element placement | `form-patterns.md` |
-| Create or structurally modify `Form.xml` | `forms-add.md`, `metadata-xml-workarounds.md` |
-| Programmatic modification of typical forms (element placement, fill checking, form commands) | `forms-add.md → Form-Presentation Rules` |
+| Create or structurally modify `Form.xml` of a form of the project's own object | `forms-add.md`, `metadata-xml-workarounds.md` |
+| Any change of a typical form (new fields, groups, commands, element placement, fill checking) — code through `РедакторФорм`, never `Form.xml` / `Form.form` | `forms-add.md → Programmatic Modification of Typical Forms — hard rule`, `form-module.md` |
 | Add or rename form event handlers | `form-module.md → Adding Form Event Handlers` |
 | Edit `Form.Module.bsl` logic | `form-module.md` |
 | Server-side form-module code (reserved names `ПараметрыВыбора`, `СвязиПараметровВыбора`, `СписокВыбора`, `ПараметрыОтбора`, `ОтборСтрок`) | `form-module.md → Reserved Names` |

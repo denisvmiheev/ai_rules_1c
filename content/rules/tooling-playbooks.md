@@ -128,7 +128,7 @@ If the refactor is large enough to enter the subagent pipeline — delegate per
 
 ## Form Analysis and Generation
 
-**Step 0 — same hard gate as above.** Creating or structurally modifying `Form.xml` / layouts goes through the **`1c-metadata-manage`** skill (`form-manage.md`, form-compile DSL) or the `1c-metadata-manager` subagent; load `forms.md` (router) for the design rules. Hand-writing `Form.xml` while the skill is available is a defect (`SKILL.md → Hard rule`).
+**Step 0 — same hard gate as above.** Creating or structurally modifying `Form.xml` / layouts goes through the **`1c-metadata-manage`** skill (`form-manage.md`, form-compile DSL) or the `1c-metadata-manager` subagent; load `forms.md` (router) for the design rules. Hand-writing `Form.xml` while the skill is available is a defect (`SKILL.md → Hard rule`). This playbook covers forms of the project's own objects only: a **typical form** is changed in BSL through `РедакторФорм`, never by steps 6–7 (`forms-add.md → Programmatic Modification of Typical Forms — hard rule`).
 
 1. **1c-metadata-manage skill** — `SKILL.md` → `form-manage.md` (+ `form-compile-dsl.md` for generation); direct execution vs. subagent per Dispatch Strategy.
 2. **get_objects_by_tags/get_tags** — similar existing forms in the configuration.

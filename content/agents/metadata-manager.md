@@ -38,6 +38,8 @@ If the task creates, scaffolds, compiles, or structurally edits a managed form (
 2. Load companions it selects (`form-patterns.md`, `forms-add.md`, `form-module.md`, `async-methods.md`, `metadata-xml-workarounds.md`, …) — do not skip the router and jump straight into skill docs.
 3. Then continue with Steps 1–5 below (skill dispatch + domain docs + PowerShell tools).
 
+A **typical form** (vendor object form, typical common form) leaves this path entirely: no declarative edit, no EDT-MCP form-member calls — the change is BSL through `РедакторФорм` (`forms-add.md → Programmatic Modification of Typical Forms — hard rule`); this agent does only the metadata part (e.g. the new attribute of the typical object).
+
 Skill-local `docs/form-patterns.md` is a thin pointer to the canonical rule `content/rules/form-patterns.md`.
 
 ### Step 1 — Read the skill dispatch file

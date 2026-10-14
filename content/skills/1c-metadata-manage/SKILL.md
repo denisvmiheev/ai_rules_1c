@@ -17,6 +17,8 @@ The same gate covers **infobase operations** (create / run, load / dump configur
 
 **EDT-format sources:** the tools of this skill address the **Designer XML dump** (`Configuration.xml`, object XML, `Form.xml`, MXL / SKD, `Role.xml`). A project developed in 1C:EDT (`.dev.env` `USE_EDT=true`) may instead keep its sources in **EDT format** — `.project`, `DT-INF/`, `src/**/*.mdo`, `Form.form` — which is outside this toolchain: never point these scripts at `src/`, and never hand-edit `*.mdo` / `*.form` as a workaround. Metadata mutations there go through EDT (EDT-MCP `create_metadata` / `modify_metadata` / `rename_metadata_object` / …, the EDT UI, or a confirmed export → XML → import round trip) per `content/rules/edt-workflow.md`. When the working tree **is** a Designer XML dump, this skill applies unchanged whether or not the humans edit it in EDT.
 
+**Typical forms are never mutated by this skill.** A managed form of the vendor configuration (a typical object's form, a typical common form) is changed only programmatically through the `РедакторФорм` library in its form module — `content/rules/forms-add.md → Programmatic Modification of Typical Forms — hard rule`. The same ban covers EDT-MCP `create_metadata` / `modify_metadata` on the form's members. This skill still owns the *metadata* part of such a change, e.g. the new attribute of the typical object.
+
 The only exceptions:
 
 - **Unambiguous one-line fix** of an existing value that cannot break structure — a synonym / comment typo, a boolean flag flip on an existing element. Anything that adds / removes / reorders elements, touches UUIDs, or spans more than one line of XML is not "one-line".

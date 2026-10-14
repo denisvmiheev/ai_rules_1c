@@ -14,7 +14,7 @@ Do not duplicate that sequence here.
 
 ## Rules specific to creating / modifying a form
 
-- **The `1c-metadata-manage` skill (form-manage section) is the mandatory execution path** for creating or structurally modifying `Form.xml` — hard gate per `AGENTS.md → Skills and Subagents`; the skill drives the toolchain (BOM, encoding, UID generation, ordering of `ChildObjects`). Hand-editing is allowed only within the narrow exceptions of `content/skills/1c-metadata-manage/SKILL.md → Hard rule` (unambiguous one-line fix; skill not available — stated once).
+- **The `1c-metadata-manage` skill (form-manage section) is the mandatory execution path** for creating or structurally modifying `Form.xml` — hard gate per `AGENTS.md → Skills and Subagents`; the skill drives the toolchain (BOM, encoding, UID generation, ordering of `ChildObjects`). Hand-editing is allowed only within the narrow exceptions of `content/skills/1c-metadata-manage/SKILL.md → Hard rule` (unambiguous one-line fix; skill not available — stated once). This path is for forms of the project's own objects only — a **typical form** is never mutated declaratively (*Programmatic Modification of Typical Forms — hard rule* below).
 - **XSD validation is mandatory** after any XML edit — `verify_xml` against the schema returned by `get_xsd_schema(object_type="Форма")`. A form that parses in your editor is not a form that loads in Designer.
 - **Form-element naming.** Elements added to a typical form must carry the `{PREFIX}` prefix from `.dev.env`. Elements inside a newly created form (object already prefixed) do **not** repeat the prefix on every element — see `dev-standards-change-markers.md → "Metadata Naming"`.
 - **Common pitfalls** are catalogued in `metadata-xml-workarounds.md` — read it before hand-editing the XML.
@@ -22,9 +22,44 @@ Do not duplicate that sequence here.
 
 ## Form-Presentation Rules
 
-### Programmatic Modification of Typical Forms
+### Programmatic Modification of Typical Forms — hard rule
 
-All typical form modifications are performed **programmatically**, not visually. Elements are created in the `OnCreateAtServer` handler (or via subscription / extension).
+A **typical form** is any managed form of the vendor configuration — a form of a typical object or a typical common form, i.e. every form the project did not create itself under `{PREFIX}`. Typical forms are changed **only programmatically, through the `РедакторФорм` common-module library**. Never change their `Form.xml` / `Form.form`: not by hand, not with the `1c-metadata-manage` tools, not with EDT-MCP `create_metadata` / `modify_metadata` on form members (items, form attributes, commands, event handlers), not in the EDT / Designer form editor. A declarative change of a typical form is a **defect** with the same standing as a hand edit: it collides with every vendor update of that form, while code in the form module survives the update merge.
+
+- **Where.** A server procedure `{PREFIX}ПодготовитьФорму()` in the company region of the form module, called once at the end of `ПриСозданииНаСервере` between change markers (`dev-standards-change-markers.md §3`). It starts with the re-entry guard `Если РедакторФорм.ФормаПодготовлена(ЭтотОбъект) Тогда Возврат; КонецЕсли;`.
+- **How.** Build the element context with `РедакторФорм.НовыйКонтекстЭлемента(ЭтотОбъект, <Родитель>, <ПередЭлементом>)`, fill `Контекст.Свойства` (`Заголовок`, `ТолькоПросмотр`, …), then call the matching constructor: `НовыйРеквизитОбъектаФормы` for an object attribute (field kind follows the value type), `НоваяГруппаФормы` / `НоваяГруппаОбычная`, `НоваяТаблицаФормы`, `НоваяКомандаИКнопкаФормы`, `НоваяДекорацияНадпись`, …. The library differs between projects — read its live API (`get_module_structure` on `CommonModules/РедакторФорм/Module.bsl`, `responseFormat=detailed`) and one existing call site before writing code.
+- **Metadata stays metadata.** A new attribute of a typical *object* is still created through the `1c-metadata-manage` skill / EDT-MCP; only its appearance on the typical form is code.
+- **No library — stop.** If the project has no `РедакторФорм` common module, do not fall back to a form edit or to ad-hoc `Элементы.Добавить`: raise `CONFUSION` and let the user decide.
+- **Out of scope.** Forms of objects the project created (`{PREFIX}` objects) are designed declaratively as usual (see *New Forms* below); adopted forms in an extension follow `extension-patterns.md`.
+
+```bsl
+&НаСервере
+Процедура ПриСозданииНаСервере(Отказ, СтандартнаяОбработка)
+	// ... typical code ...
+	// {COMMENT_OPEN}
+	{PREFIX}ПодготовитьФорму();
+	// {COMMENT_CLOSE}
+КонецПроцедуры
+
+#Область {COMPANY}
+
+// {COMMENT_OPEN}
+&НаСервере
+Процедура {PREFIX}ПодготовитьФорму()
+
+	Если РедакторФорм.ФормаПодготовлена(ЭтотОбъект) Тогда
+		Возврат;
+	КонецЕсли;
+
+	Контекст = РедакторФорм.НовыйКонтекстЭлемента(ЭтотОбъект, Элементы.ГруппаВыплата, Элементы.СпособВыплаты);
+	Контекст.Свойства.Вставить("Заголовок", НСтр("ru = 'Характер выплаты'"));
+	РедакторФорм.НовыйРеквизитОбъектаФормы(Контекст, "{PREFIX}ХарактерВыплаты");
+
+КонецПроцедуры
+// {COMMENT_CLOSE}
+
+#КонецОбласти
+```
 
 ### Placement of Added Elements
 

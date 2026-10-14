@@ -94,6 +94,7 @@ What changes:
 - **`get_form_layout_snapshot`** returns the calculated layout as text — the default choice for "what does this form look like / did my change land". It is far cheaper than an image and diffable between states.
 - **`get_form_screenshot`** / `get_template_screenshot` need EDT started with `-DnativeFormBufferedLayoutRender=true` (`/install-edt-mcp`, step 3). Use them for genuine visual questions only.
 - Layout knowledge itself is format-independent — `content/rules/form-patterns.md` applies unchanged.
+- **Typical forms:** never `create_metadata` / `modify_metadata` on the members of a typical form (items, form attributes, commands, handlers) — change it in BSL through `РедакторФорм` (`content/rules/forms-add.md → Programmatic Modification of Typical Forms — hard rule`).
 
 ## Git and the configuration repository
 
