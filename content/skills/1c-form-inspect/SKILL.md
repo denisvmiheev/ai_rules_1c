@@ -24,7 +24,7 @@ Every call takes `projectName` (`list_projects`); take exact parameter names fro
 
 ## Ordinary forms
 
-Ordinary (non-managed) forms are binary in Designer dumps (`Forms/<Имя>/Ext/Form.bin`): unpack and rebuild them through `content/skills/v8unpack-cf/SKILL.md → Ordinary forms`, never edit `Form.bin` directly.
+`Forms/<Имя>/Ext/Form.bin` is a binary container: none of the XML routes see it. Read it with the `form-ordinary` skill — `decode` (layout by its format map), `brief` (what the user sees and what the module changes), `render` — and change it there too, not through `1c-metadata-manage` (`content/skills/form-ordinary/SKILL.md`). Never edit `Form.bin` directly.
 
 ## After the change
 

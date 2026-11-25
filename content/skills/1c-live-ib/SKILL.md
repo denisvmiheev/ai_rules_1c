@@ -21,7 +21,7 @@ Escalate here only when the configuration, the static validators and the docs ca
 ## Safety
 
 - Read-only first: `get_event_log` and `validate_query` need no session; `evaluate_expression` only for non-mutating expressions.
-- No `Записать()`, `Удалить()`, `НачалоТранзакции`, register movements without asking the user, naming the object and having a rollback plan; only on a copy infobase — on a production IB refuse and request a copy.
+- No `Записать()`, `Удалить()`, `НачатьТранзакцию`, register movements without asking the user, naming the object and having a rollback plan; only on a copy infobase — on a production IB (`.dev.env` `INFOBASE_ROLE=prod`) refuse and request a copy.
 - No secrets or personal data in expressions or queries; they may be logged.
 - Debug and `update_database` act on a real application: confirm the target is a dev / test base first, exactly as the deployment commands require.
 - Gate 3a (`content/rules/verification-gates.md`) uses only the read-only tools.

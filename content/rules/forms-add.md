@@ -1,16 +1,12 @@
 ---
-description: Creating or substantially changing a managed form (`Form.xml` + `Form.Module.bsl`), including typical-form modification, element placement, fill checks, commands. Load from `forms.md` for any form creation or presentation task.
+description: Managed-form creation and structure (`Form.xml`) — typical-form edits, element placement, fill checks, commands, main attribute. Load from `forms.md` for form structure.
 alwaysApply: false
 category: forms
 ---
 
 # Adding or Modifying a Managed Form
 
-This file owns the **rules**, not the MCP sequence. The pre-edit and post-edit MCP playbooks live in:
-
-- `tooling-playbooks.md → Form Analysis and Generation` — full ordered list of MCP calls (`get_objects_by_tags`/`get_tags` → `get_form_layout_snapshot` → `get_metadata_objects` → `create_metadata` / `modify_metadata` on form FQNs → `revalidate_objects` → `get_project_errors`).
-
-Do not duplicate that sequence here.
+This file owns the **rules**, not the MCP sequence: the ordered pre- and post-edit calls live in `tooling-playbooks.md → Form Analysis and Generation` (`get_objects_by_tags`/`get_tags` → `get_form_layout_snapshot` → `get_metadata_objects` → `create_metadata` / `modify_metadata` on form FQNs → `revalidate_objects` → `get_project_errors`).
 
 ## Rules specific to creating / modifying a form
 
@@ -18,7 +14,7 @@ Do not duplicate that sequence here.
 - **Validation is mandatory** after any form change — `revalidate_objects` on the form's owner FQN, then `get_project_errors` scoped to it. There is no XSD validator on `edt-mcp`; a form that parses in your editor is not a form that loads in EDT, so the marker check is the gate.
 - **Form-element naming.** Elements added to a typical form must carry the `{PREFIX}` prefix from `.dev.env`. Elements inside a newly created form (object already prefixed) do **not** repeat the prefix on every element — see `dev-standards-change-markers.md → "Metadata Naming"`.
 - **Common pitfalls** are catalogued in `metadata-xml-workarounds.md` — read it before hand-editing the XML.
-- **Region structure of the form module** — `module-structure.md → Form Module` (5 mandatory regions).
+- **Region structure of the form module** — `module-structure.md → Form Module` (mandatory regions).
 
 ## Form-Presentation Rules
 
@@ -58,7 +54,7 @@ All typical form modifications are performed **programmatically**, not visually.
 ### Main attribute and standard commands
 
 - Object fields are bound as `Объект.<Имя>` (`Запись.<Имя>` in an information-register record form). Never create a form attribute with the same name as an object field to «show» it: the value lives only in the form, never reaches the object, and is lost on write.
-- A register record form keeps its standard «Записать» / «Записать и закрыть» only while its main attribute is `Запись` of type `InformationRegisterRecordManager.<Имя>` with `SavedData=true`; flat form attributes in its place remove the object semantics together with those commands. `form-add` creates exactly that main attribute; `form-validate` check 12b rejects a default object / record form whose main attribute belongs to another object.
+- A register record form keeps its standard «Записать» / «Записать и закрыть» only while its main attribute is `Запись` of type `InformationRegisterRecordManager.<Имя>` with `SavedData=true`; flat form attributes in its place remove the object semantics together with those commands. `form-add` creates exactly that main attribute; `form-validate` check 28 rejects a default object / record form whose main attribute belongs to another object.
 
 ## Companion rules
 

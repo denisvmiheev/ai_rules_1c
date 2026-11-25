@@ -7,12 +7,12 @@
 Apply senior-level 1C/BSL expertise within the active role's scope and permissions. Documentation is authoritative: verify platform APIs, metadata and version-dependent behaviour before use; produce reviewable, reversible changes.
 
 - Prefer existing project code, platform mechanisms, БСП and fitting templates over new code.
-- **Codebase conventions first:** follow the edited module, then its subsystem. Style may yield; ВерблюжьяНотация identifiers, correctness, security, data integrity and hard gates never yield.
+- **Code owner — `.dev.env` `CODE_OWNER`:** `user` (default) owns the code — follow the edited module, then its subsystem; `agent` — you own the project's code and set its design (`content/rules/dev-standards-env-process.md → CODE_OWNER`). Style may yield; ВерблюжьяНотация identifiers, correctness, security, data integrity and hard gates never yield.
 - Current source outranks stale summaries; be explicit about evidence, uncertainty, residual risk and unfinished work.
 
 ## Active model adaptation
 
-`AGENT_MODEL` in `.dev.env` (`opus5`, `sonnet5`, `fable5`, `gpt56`, `gpt6`) selects one profile, `content/rules/model-<slug>.md`, read before the first non-trivial task. A known running model overrides a mismatched value (say so, suggest `/rulesmodel`); empty, invalid or no profile → base rules, never a neighbour, never ask. Profiles never relax gates (`content/rules/model-adaptation.md`).
+The model you know you run selects a profile, `content/rules/model-<slug>.md` (`opus5`, `sonnet5`, `fable5`, `gpt56`, `gpt6`), read before the first non-trivial task. `.dev.env` `AGENT_MODEL` decides only if you cannot tell; `off` disables; mismatch → say so, suggest `/rulesmodel`. No profile → base rules, no neighbour, never ask. Profiles never relax gates (`content/rules/model-adaptation.md`).
 
 ## Development Procedure
 
@@ -21,15 +21,15 @@ Apply senior-level 1C/BSL expertise within the active role's scope and permissio
 Load `content/rules/verification-policy.md` for triage and gates; task paths are independent of `/sdlc` QA profiles.
 
 1. **Docs-fix** — prose only, no BSL/metadata or verifiable 1C claims: structural checks of edited files and direct references, no BSL validators.
-2. **Spec-authoring** — OpenSpec with concrete 1C facts: confirm them via MCP first (`content/rules/sdd-integrations.md`).
-3. **Quick-fix** — one logical change in one module within `QUICKFIX_MAX_LINES` (default 40) or one isolated unwired metadata addition: two-line plan → edit → gates at `VERIFICATION_DEPTH`.
+2. **Spec-authoring** — OpenSpec with concrete 1C facts: confirm them via MCP first (`content/rules/sdd-propose.md`).
+3. **Quick-fix** — one logical change in one module within `QUICKFIX_MAX_LINES` (default 40) or one isolated unwired metadata addition: two-line plan → edit → the policy's self-contained Quick-fix gate.
 4. **Full-cycle** — everything else or material doubt: steps 1–5 to Definition of Done; review and behavioural confirmation unless explicitly waived. UI criteria follow `UI_TESTING`.
 
 Transactions/posting, public contracts, wired metadata, adopted extension objects, RLS, subscriptions and scheduled jobs are full-cycle at any size. Reduced planning never waives validation or metadata tooling.
 
 ### 1. Think Before Coding — Clarify Scope First
 
-Before editing, plan files, changes, success checks, risks and rollback; name a simpler approach if one exists; resolve low-risk ambiguity with a stated assumption.
+Before editing, plan files, changes, success checks, risks and rollback; name a simpler approach if one exists; resolve low-risk ambiguity with a stated assumption. For optimization, link the technical metric to the user's business goal.
 
 **Material fork → stop dependent work and ask using CONFUSION.** Triggers: data integrity, transactions/posting, metadata shape, public contracts, security/RLS, hard-to-reverse choices; conflict with existing code, БСП or supported versions; unspecified material handling of duplicates, missing data, external failures or an empty period.
 
@@ -51,18 +51,18 @@ One logical change at a time; every changed line traces to the task. Read the ed
 
 ### 4. Goal-Driven Verification — Double-Check Everything
 
-Define observable success (reproduce the bug, enumerate invalid inputs, keep behaviour across a refactor); check side effects and downstream impact; run applicable gates of `content/rules/verification-gates.md` on the final state. Missing tools or exhausted budgets are not passes.
+Define observable success (reproduce the bug, enumerate invalid inputs, keep behaviour across a refactor); check side effects and downstream impact; run applicable gates (full-cycle: `content/rules/verification-gates.md`) on the final state. Missing tools or exhausted budgets are not passes.
 
 ### 5. Deliver Clearly
 
-Report changes, every modified file, checks and real limitations; for non-trivial BSL/metadata/spec work also the context sources used and relevant omissions. Evidence lines, only those that apply: `Memory:`, `Template:`, `Docs:`, `Metadata tooling:`, `IB tooling:`, `Repository tooling:`. Contract: `content/rules/verification-delivery.md`.
+Report changes, every modified file, checks and real limitations; for non-trivial BSL/metadata/spec work also the context sources used and relevant omissions. Evidence lines, only those that apply: `Memory:`, `Template:`, `Typical reuse:`, `Docs:`, `Metadata tooling:`, `IB tooling:`, `Repository tooling:`, `EDT tooling:`. Contract: `content/rules/verification-delivery.md`.
 
 ## Project info
 
-- Project context: `openspec/project.md` when present. Settings: `.dev.env` — never guess or duplicate values; ask only for one the current operation needs (`content/rules/dev-standards-env.md`).
+- Project context: `openspec/project.md` when present. Settings: `.dev.env` (`Grep ^[A-Z]`) — never guess or duplicate values; ask only for one the current operation needs (`content/rules/dev-standards-env.md`).
 - Read root `USER-RULES.md`, `memory.md` and, when present, `LLM-RULES.md`; precedence `USER-RULES.md`/`memory.md` → `LLM-RULES.md` → this file and on-demand rules. Unreachable required rule → report the gap, stop only dependent work.
 - **Language:** rules and `content/` prose — English; BSL identifiers/comments/literals, metadata synonyms, user-facing strings, replies and top-level human docs — Russian.
-- Monthly: on the first non-trivial task check `.ai-rules.json` `lastUpdatesCheckAt` (else `updatedAt`/`installedAt`); missing or over 30 days → `content/rules/support-feedback.md §4`, read-only `/checkupdates` once at the end, never auto-update.
+- Monthly: on the first non-trivial task check `.ai-rules.json` `lastUpdatesCheckAt` (else `updatedAt`/`installedAt`); missing or over 30 days → read-only `/checkupdates` (`content/commands/checkupdates.md`) once at the end, never auto-update.
 
 ### Path convention — source vs. installed copies
 
@@ -72,32 +72,19 @@ Report changes, every modified file, checks and real limitations; for non-trivia
 
 ## MCP Tool Calling
 
-**Hard gate:** before the first 1C MCP call (per session; per run for a subagent) and before writing or reviewing BSL/metadata, 1C spec or memory operation — even with no server exposed — read `content/rules/mcp-policy.md` in full, then `content/skills/mcp-1c-tools/SKILL.md` and the operation skill it names. The policy owns tool policy, availability, fallbacks and server answers; the index below uses its numbers and never replaces it. Acting without it is a defect.
+**Hard gate:** before the first non-memory 1C MCP call (per session; per subagent run), and before writing or reviewing BSL/metadata or a 1C-fact spec, read `content/rules/mcp-policy.md` in full, `content/skills/mcp-1c-tools/SKILL.md`, then the selected operation skill. This applies even when no server is exposed. Memory-only operations enter through `content/rules/project-memory.md`; they do not load the 1C policy/router.
 
 ### A. Priority and obligation
 
-1. **Scope:** risk-bearing 1C work, memory and 1C-fact specs use the relevant exposed tools; prose-only edits get structural checks.
-2. **External knowledge:** platform/БСП/ITS only when their facts matter.
-3. **Evidence:** minimum set per `content/rules/tooling-playbooks.md`; confirm 1C facts before writing; disclose gaps.
-4. **Search:** `content/rules/mcp-first-search.md` before searching 1C sources.
-5. **Validation:** `revalidate_objects` (+ `validate_query` for query text) → `get_project_errors` → `get_check_description` / `get_problem_summary` at the active depth; metadata — the same on the changed FQNs.
-6. **ITS:** `v8std-local` (`v8std_search`, `v8std_explain_diagnostics` → `v8std_get_page`); state when a claim is unverified.
-7. **Platform first:** before a custom specialized mechanism — `docsearch` → `docinfo` (+ `ssl_search`); build on a find; partial fit → `CONFUSION`; reject only for documented incompatibility, stated.
-8. **`templatesearch`:** task text or a same-goal paraphrase, never keywords.
-9. **Template reuse:** a fitting template is the base; reject only for a named reason; report its disposition.
+`mcp-policy.md → A. Priority and obligation` owns tool selection and minimum evidence, scoped source search, platform-first discovery, template reuse and ITS retrieval (`v8std-local`). Load `content/rules/mcp-first-search.md` before 1C source discovery. Platform APIs must be verified before use; a fitting template is the base; ITS search hits require full retrieval (`v8std_get_page`). Saved BSL and changed metadata follow `revalidate_objects` (+ `validate_query` for query text) → `get_project_errors` → `get_check_description` / `get_problem_summary` at the active depth.
 
 ### B. Limits and non-determinism
 
-1. One clean pass on the latest state; a blocking fix needs confirmation within `content/rules/verification-policy.md` budgets; no loops for style noise; unconfirmed = unverified.
-2. AI rewrites and answers are drafts; validate before delivery.
+`mcp-policy.md → B. Limits and non-determinism` and `verification-policy.md` own validator budgets. AI output is a draft; a required check without a clean confirming result is unverified.
 
 ### C. Call discipline
 
-1. Each call closes a gap; no repeats on unchanged state; independent opening calls go in one parallel batch.
-2. Tune parameter-rich queries; reformulate a miss once.
-3. Structural tools before substring search or full reads.
-4. Argument names come from the live tool schema (`get_tool_guide`), never guessed.
-5. A typed server answer maps to an action by its code (`mcp-policy` C); never re-probe the same gap via sibling tools.
+`mcp-policy.md → C. Call discipline and server answers` owns bounded recovery. Each call closes a gap; no unchanged repeats. Batch independent calls, prefer structural searches and use documented arguments (`get_tool_guide`). A closed lane stays closed.
 
 ## Coding Standards
 
@@ -116,7 +103,7 @@ Before writing or reviewing BSL/metadata, load `content/rules/coding-standards.m
 
 ## Project memory
 
-1C changes and corrections → `content/rules/project-memory.md`. Recall before design (scope by triage); save corrections in the same turn; no secrets/PII.
+Before memory operations, 1C changes or correction capture, load `content/rules/project-memory.md` and its shared tool policy. Recall scope, durable writes and failure recovery live there. With no eligible memory tools, load `content/rules/memory-setup.md` once per session. Save corrections in the same turn; no secrets/PII.
 
 ## Rules self-improvement (`/evolve` + `LLM-RULES.md`)
 
@@ -128,14 +115,14 @@ Load `content/rules/<name>.md` on its trigger only; routers pull companions and 
 
 - settings, platform/ИБ, UI-test policy → `dev-standards-env`
 - typical-code changes, metadata naming → `dev-standards-change-markers`
-- new or restructured module / query / managed form → `module-structure` / `query-design` / `forms`
-- code, review, debug, refactor, performance, metadata work → `tooling-playbooks`
+- new or restructured module / query / form → `module-structure` / `query-design` / `forms`
+- code, review, debug, refactor, performance, metadata work → `tooling-playbooks`, except quick-fix (see `verification-policy`)
 - `USE_EDT=true` → `edt-workflow`
 - applying a configuration/extension, missing MCP validators → `designer-batch-checks`
-- UI tests → `ui-testing-tools` → `web-client-driving`
+- UI tests → `ui-testing-tools` → QA MCP: skill `1c-qa-testing` + `qa-testclient`; web: `web-client-driving`
 - extract from ИБ → `getconfigfiles`; integrations → `integrations-add`
 - metadata hand-edit within a skill exception → `metadata-xml-workarounds`
 
 # Spec-driven development workspace
 
-`openspec/specs/` is current behaviour, `openspec/changes/` holds change artifacts; before OpenSpec work load `content/rules/sdd-integrations.md` (owns full-cycle DoD and apply completion).
+`openspec/specs/` is current behaviour, `openspec/changes/` holds change artifacts; before OpenSpec work load `content/rules/sdd-integrations.md`.

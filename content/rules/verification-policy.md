@@ -1,5 +1,5 @@
 ---
-description: Verification policy — depth levels, quick-fix eligibility, promotion triggers, and the quick-fix gate
+description: "Verification depth and triage — VERIFICATION_DEPTH, quick-fix eligibility, promotion triggers, the quick-fix gate. Load at task triage, when choosing quick-fix or full-cycle, or to close a quick-fix."
 alwaysApply: false
 category: quality
 ---
@@ -10,11 +10,11 @@ category: quality
 
 The closing gates themselves live in `verification-gates.md`; delivery-only checks live in `verification-delivery.md`.
 
-Depth controls validators, not UI confirmation or completion review. `lite` is not a waiver of either; OpenSpec DoD: `sdd-integrations.md`.
+Depth controls validators, not UI confirmation or completion review. `lite` is not a waiver of either; full-cycle DoD: `verification-delivery.md`.
 
 ## Validator budget
 
-Single owner of the retry budget for the validator chain — `revalidate_objects` / `validate_query` → `get_project_errors` → `get_check_description` / `get_problem_summary`; `AGENTS.md → MCP Tool Calling → B.1` and the gate descriptions point here.
+Single owner of the retry budget for the validator chain — `revalidate_objects` / `validate_query` → `get_project_errors` → `get_check_description` / `get_problem_summary`; `mcp-policy.md → B.1` and the gate descriptions point here.
 
 - **Cycle** — one logical edit of one module; every new behavioural edit starts a new cycle.
 - **Default** — one clean pass per validator on the latest artifact state.
@@ -34,7 +34,7 @@ SDLC QA profiles set `VERIFICATION_DEPTH` in `.dev.env`: `lite`, `standard` (def
 |---|---|---|
 | `full` | Gates 1–3; after a blocking fix up to 3 calls total per validator (Validator budget above). | Gates 1–3, same budget. |
 | `standard` (default) | Gates 1–3; after a blocking fix exactly one confirmation (2 calls total), no open-ended retry loop. | Gate 1 (`revalidate_objects`) + Gate 2 (`get_project_errors` severity `BLOCKER` / `CRITICAL` / `MAJOR`); Gate 3 (`MINOR` / `TRIVIAL` → `get_problem_summary`) only on explicit request (a promotion trigger makes the change full-cycle) — style is governed by the surrounding code and BSL LS, a second pass on a small fix buys little. |
-| `lite` | Gates 1–2; Gate 3 only on explicit request. | Gate 1 only. |
+| `lite` | Gates 1–2. An explicit code review request selects Gates 1 → 2 → 3. | Gate 1 only. An explicit code review request selects Gates 1 → 2 → 3. |
 
 **Safety floor — never crossed by any level:**
 
@@ -72,9 +72,15 @@ When in doubt — full-cycle wins.
 
 Quick-fix reduces planning and delegation overhead and, at the default depth, the style review — never Gate 1, and never on a promotion-trigger path, which is full-cycle. The depth of Gates 1–3 is a project-wide setting, `VERIFICATION_DEPTH` (see "Verification depth levels" above); the retry budget after a blocking defect follows the level (one mandatory confirmation at `standard`):
 
-- BSL quick-fix — run the level's gates in order: `standard` — `revalidate_objects` → `get_project_errors`; `full` — all three; `lite` — `revalidate_objects` only. Gate 3 joins when the user asks for a review; a promotion trigger makes the task full-cycle instead.
-- Pure metadata quick-fix — run Gate 5 (`revalidate_objects` + `get_project_errors`).
-- Metadata that embeds or generates BSL — run Gates 1–3 for every touched module, then Gate 5.
+**This section is the complete closing contract of a quick-fix**: it needs neither `verification-gates.md` nor `verification-delivery.md` nor `tooling-playbooks.md`. Load `verification-gates.md` only for what this section does not carry — a validator of the level that is missing or failed (its graceful degradation), or the procedure of Gate 3a / 4 / 5 / 6 when that gate's trigger fires.
+
+- Evidence before the edit — the target procedure and the helpers it directly calls (`mcp-policy.md → A.3`), plus the recall of `project-memory.md`.
+- For every touched BSL module, select the chain from the quick-fix column of the depth table above, including its explicit-review condition.
+- Pass criteria — Gate 1: `revalidate_objects` + `get_project_errors severity=ERRORS` (plus `validate_query` for query text), zero `ERRORS`; Gate 2: no `BLOCKER` / `CRITICAL` / `MAJOR` introduced by your change (pre-existing ones stay); Gate 3: no blocking style findings (`get_problem_summary`). A gate the level did not select is reported as not applicable, never as passed.
+- A bug fix re-checks the original failing scenario after the edit and names it in the delivery; temporary debug output is removed.
+- Delivery — what was done, the changed file, the validators that ran with their results, the `Memory:` line, the tooling line of a metadata / infobase / repository operation when one happened (`Metadata tooling:`, `IB tooling:`, `Repository tooling:`), and Risks only when real. No other sections and no placeholder evidence lines.
+- Pure metadata quick-fix — run Gate 5 (`revalidate_objects` + `get_project_errors` on the changed FQNs).
+- Metadata that embeds or generates BSL — run the selected BSL chain on each touched module, then Gate 5.
 - Gate 4 follows its own triggers. A bounded caller check for an internal export fix, or a reference check confirming that an isolated metadata addition is unwired, is compatible with quick-fix. Reuse the context already collected. Promote when that check reveals a contract change, wiring, transactional / security impact or another promotion trigger; needing an impact lookup alone is not a promotion trigger. If the relevant boundary cannot be established, treat the uncertainty as full-cycle and report any unavailable verification.
 
-The validator availability and retry-budget rules in `verification-gates.md` apply unchanged. Missing validators use the same documented graceful degradation; they are never silently skipped.
+Validator availability (`tool-policy.md` / `mcp-policy.md`) and the *Validator budget* above apply unchanged. For a missing or failed validator, follow `verification-gates.md → Graceful degradation for Gates 1–3 — when a validator is not exposed` instead of silently skipping.

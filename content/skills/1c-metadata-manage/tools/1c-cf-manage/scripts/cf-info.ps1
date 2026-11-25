@@ -1,7 +1,8 @@
-﻿# cf-info v1.4 — Compact summary of 1C configuration root
+﻿# cf-info v1.12 — Compact summary of 1C configuration root
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
+[CmdletBinding(PositionalBinding=$false)]
 param(
-	[Parameter(Mandatory=$true)][Alias('Path')][string]$ConfigPath,
+	[Parameter(Mandatory=$true, Position=0)][Alias('Path')][string]$ConfigPath,
 	[ValidateSet("overview","brief","full")]
 	[string]$Mode = "overview",
 	[Alias('Name')]
@@ -21,7 +22,7 @@ function Out([string]$text) { $script:lines += $text }
 
 # --- Resolve path ---
 if (-not [System.IO.Path]::IsPathRooted($ConfigPath)) {
-	$ConfigPath = Join-Path (Get-Location).Path $ConfigPath
+	$ConfigPath = Join-Path (Get-Location).ProviderPath $ConfigPath
 }
 
 # Directory -> find Configuration.xml
@@ -85,20 +86,20 @@ function Get-PropML([string]$propName) {
 	return (Get-MLText $n)
 }
 
-# --- Type name maps (canonical order, 44 types) ---
+# --- Type name maps (canonical order, 46 types) ---
 $typeOrder = @(
 	"Language","Subsystem","StyleItem","Style",
 	"CommonPicture","SessionParameter","Role","CommonTemplate",
-	"FilterCriterion","CommonModule","Bot","CommonAttribute","ExchangePlan",
+	"FilterCriterion","CommonModule","CommonAttribute","ExchangePlan",
 	"XDTOPackage","WebService","HTTPService","WSReference",
 	"EventSubscription","ScheduledJob","SettingsStorage","FunctionalOption",
-	"FunctionalOptionsParameter","DefinedType","CommonCommand","CommandGroup",
+	"FunctionalOptionsParameter","DefinedType","Bot","PaletteColor","CommonCommand","CommandGroup",
 	"Constant","CommonForm","Catalog","Document",
 	"DocumentNumerator","Sequence","DocumentJournal","Enum",
 	"Report","DataProcessor","InformationRegister","AccumulationRegister",
 	"ChartOfCharacteristicTypes","ChartOfAccounts","AccountingRegister",
 	"ChartOfCalculationTypes","CalculationRegister",
-	"BusinessProcess","Task","IntegrationService"
+	"BusinessProcess","Task","ExternalDataSource","IntegrationService"
 )
 
 $typeRuNames = @{
@@ -119,7 +120,7 @@ $typeRuNames = @{
 	"ChartOfCharacteristicTypes"="ПВХ"; "ChartOfAccounts"="Планы счетов"
 	"AccountingRegister"="Регистры бухгалтерии"; "ChartOfCalculationTypes"="ПВР"
 	"CalculationRegister"="Регистры расчёта"; "BusinessProcess"="Бизнес-процессы"
-	"Task"="Задачи"; "IntegrationService"="Сервисы интеграции"
+	"Task"="Задачи"; "ExternalDataSource"="Внешние источники данных"; "IntegrationService"="Сервисы интеграции"
 }
 
 # --- Read panel layout (Ext/ClientApplicationInterface.xml) ---
@@ -188,7 +189,7 @@ function Get-HomePageLayout {
 	$result = [ordered]@{ template = ""; left = @(); right = @() }
 	$tmplNode = $hpDoc.DocumentElement.SelectSingleNode("hp:WorkingAreaTemplate", $hpNs)
 	if ($tmplNode) { $result.template = $tmplNode.InnerText.Trim() }
-	foreach ($colName in @("LeftColumn","RightColumn")) {
+	foreach ($colName in @("Column","LeftColumn","RightColumn")) {
 		$colNode = $hpDoc.DocumentElement.SelectSingleNode("hp:$colName", $hpNs)
 		if (-not $colNode) { continue }
 		$items = @()
@@ -212,7 +213,8 @@ function Get-HomePageLayout {
 				roles = $roles
 			}
 		}
-		if ($colName -eq "LeftColumn") { $result.left = $items } else { $result.right = $items }
+		# Шаблон OneColumn хранит единственную колонку в <Column>
+		if ($colName -eq "RightColumn") { $result.right = $items } else { $result.left = $items }
 	}
 	return $result
 }
@@ -391,7 +393,8 @@ if ($Mode -eq "overview" -and -not $Section) {
 		$rn = $script:homePage.right.Count
 		Out "--- Начальная страница ---"
 		Out "  Шаблон: $($script:homePage.template)"
-		Out "  LeftColumn: $ln, RightColumn: $rn  (детали: -Section home-page)"
+		if ($script:homePage.template -eq "OneColumn") { Out "  Column: $ln  (детали: -Section home-page)" }
+		else { Out "  LeftColumn: $ln, RightColumn: $rn  (детали: -Section home-page)" }
 		Out ""
 	}
 
@@ -426,7 +429,11 @@ if ($Section -eq "home-page") {
 		Out ""
 		Out "Шаблон: $($script:homePage.template)"
 		Out ""
-		foreach ($side in @(@("LeftColumn","left"), @("RightColumn","right"))) {
+		# У OneColumn единственная колонка — <Column>; подписи — XML-имена, как их ждёт платформа
+		# Присваивание, не вывод if: конвейер развернул бы внешний массив из одного элемента
+		$sides = @(@("LeftColumn","left"), @("RightColumn","right"))
+		if ($script:homePage.template -eq "OneColumn") { $sides = @(,@("Column","left")) }
+		foreach ($side in $sides) {
 			$items = $script:homePage[$side[1]]
 			$lbl = $side[0]
 			if ($items.Count -eq 0) { Out "${lbl}: —"; Out ""; continue }
@@ -539,7 +546,8 @@ if ($Mode -eq "full" -and -not $Section) {
 		$rn = $script:homePage.right.Count
 		Out "--- Начальная страница ---"
 		Out "  Шаблон: $($script:homePage.template)"
-		Out "  LeftColumn: $ln, RightColumn: $rn  (детали: -Section home-page)"
+		if ($script:homePage.template -eq "OneColumn") { Out "  Column: $ln  (детали: -Section home-page)" }
+		else { Out "  LeftColumn: $ln, RightColumn: $rn  (детали: -Section home-page)" }
 		Out ""
 	}
 

@@ -1,6 +1,6 @@
 ---
 name: mcp-1c-tools
-description: "Router for the 1C MCP ecosystem — which server answers which need, which operation skill holds the exact calls and parameter names, and the fallback chain. Load before selecting any edt-mcp / 1C-docs-mcp / 1c-ssl-mcp / 1c-templates-fastcode / v8std-local tool."
+description: "Router for non-memory 1C MCP operations: select the server (edt-mcp / 1C-docs-mcp / 1c-ssl-mcp / 1c-templates-fastcode / v8std-local), operation skill with exact arguments, and fallback. Load before choosing a 1C tool; memory-only work enters through project-memory.md."
 ---
 
 # MCP tools for 1C — router
@@ -21,32 +21,16 @@ Load the skill for the operation, not this whole catalogue. Each skill lists the
 | Read forms, form structure, rendered layout, format specs before a form change | `content/skills/1c-form-inspect/SKILL.md` | edt, docs |
 | Validate changed BSL, queries and metadata (Gates 1–3, 5) | `content/skills/1c-validate/SKILL.md` | edt, v8std |
 | Platform reference, capability check, БСП API, routed standards, ITS, format specs | `content/skills/1c-platform-help/SKILL.md` | docs, ssl, v8std |
-| Templates as the base, project memory recall / save | `content/skills/1c-templates-memory/SKILL.md` | templates, cognee, openviking |
+| Templates as the base | `content/skills/1c-templates-memory/SKILL.md` | templates |
+| Memory recall / save (independent entry point) | `content/rules/project-memory.md` | cognee, openviking, templates |
 | What only the running infobase knows: last event-log error, query / fragment on live data | `content/skills/1c-live-ib/SKILL.md` | edt |
+| Check behaviour in the 1C interface (thin client): forms, fields, tables, commands, messages | `content/skills/1c-qa-testing/SKILL.md` + `content/rules/qa-testclient.md` | qa |
 | Create / edit / remove metadata, forms, roles, DCS, MXL, infobases | `content/skills/1c-metadata-manage/SKILL.md` | edt typed API / scripts |
 | Live 1C:EDT workspace: source format, model↔disk, DB update | `docs/edt-mcp.md`, `content/rules/edt-workflow.md` | edt |
 
 ## Server catalog
 
-| Server id | Purpose | Details |
-|---|---|---|
-| `edt-mcp` | Live 1C:EDT workspace: metadata discovery and typed mutation, BSL read/write, search, references, call hierarchy, validation markers, forms rendering, event log, DB update, debug / YAXUnit / profiling | `docs/edt-mcp.md` |
-| `1C-docs-mcp` | Platform reference (`docsearch`, `docinfo`), routed `standards`, `formatspec` | `docs/1C-docs-mcp.md` |
-| `1c-ssl-mcp` | БСП / SSL API search | `docs/1c-ssl-mcp.md` |
-| `1c-templates-fastcode` | Code templates, project vector memory (`remember` / `recall`) | `docs/1c-templates-fastcode.md` |
-| `v8std-local` | ITS «Стандарты разработки» mirror: standards search, diagnostic → standard mapping (ACC/АПК, BSLLS, EDT, v8-code-style), snippet classification | `docs/v8std.md` |
-| `cognee`, `openviking` *(optional)* | Memory providers | `docs/memory-providers.md` |
-
-The classic multi-server docker distribution (graph, code-metadata, syntax-checker, code-check, data servers) is **not** part of this ruleset's default set; `docs/edt-mcp.md → Remap from the classic docker distribution` maps its tools to `edt-mcp`.
-
-### Optional pre-alpha servers
-
-These are experimental projects, separate from the main servers above and not required by normal development gates. Client aliases vary; use the tools actually exposed in this session. Read their catalog only for a task that needs them; do not install, start a client, replay UI actions or write conversion files merely to check availability.
-
-| Project / runtime server name | Purpose | Details |
-|---|---|---|
-| `MCP_Test` / `1C Visual UI Test` | Testing knowledge base, scenario preparation, test-client processes and UI replay | `docs/mcp-test.md` |
-| `MCP_ConversionData20` / `1C Конвертация данных 2.0 — разработка правил обмена` | Metadata mapping and conversion-rule authoring/validation/export | `docs/mcp-conversion-data20.md` |
+The operation table above is sufficient for ordinary routing. Read [server-catalog.md](docs/server-catalog.md) only to identify an unfamiliar server/alias, find a server-specific reference, or select an optional pre-alpha integration. Do not load the whole catalog before a known operation.
 
 ## Fallback chain
 

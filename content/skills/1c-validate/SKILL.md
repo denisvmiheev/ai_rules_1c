@@ -7,7 +7,7 @@ allowed-tools: mcp__edt-mcp__list_projects, mcp__edt-mcp__write_module_source, m
 
 # 1c-validate — the validator chain
 
-Order for touched BSL on `edt-mcp`: refresh the markers (`revalidate_objects`, plus `validate_query` for new query text) → read the findings (`get_project_errors`) → explain and confirm (`get_check_description`, `get_problem_summary`), at the depth of `VERIFICATION_DEPTH` and within the budget of `content/rules/verification-policy.md → Validator budget` (one clean pass on the latest state; after a blocking fix one confirmation at `standard`, up to two at `full`; never a run on unchanged content). Metadata without BSL: `revalidate_objects` + `get_project_errors` scoped to the changed FQNs, once. Which gates a change needs — `content/rules/verification-gates.md`.
+Select the `edt-mcp` validation steps from the depth table in `content/rules/verification-policy.md` using the task path and explicit review request (`revalidate_objects` + `validate_query` for query text → `get_project_errors` → `get_check_description` / `get_problem_summary`), within that policy's retry budget. Changed metadata without BSL also requires `revalidate_objects` + `get_project_errors` scoped to the changed FQNs. Full-cycle gate procedures and unavailable validators — `content/rules/verification-gates.md`.
 
 ## Tools
 

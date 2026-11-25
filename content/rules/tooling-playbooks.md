@@ -1,5 +1,5 @@
 ---
-description: Per-task MCP tool playbooks — code writing, review, architecture, error fixing, performance, safe refactoring with impact analysis, metadata XML, forms, integrations. Load for code / review / debug / refactor / performance / metadata work.
+description: Per-task MCP playbooks — coding, review, architecture, debugging, performance, refactoring, metadata XML, forms, integrations. Load for full-cycle 1C work.
 alwaysApply: false
 category: tooling
 ---
@@ -14,7 +14,7 @@ Use the smallest set that closes the real context gaps; do not promote a task to
 
 | Task shape | Required before edit | Required after edit |
 |---|---|---|
-| **Quick-fix BSL** | The target module / procedure and any directly referenced helper needed to understand the change | The validator chain of the active `VERIFICATION_DEPTH` on the touched module (default `standard`: `revalidate_objects` → `get_project_errors` → `get_check_description` / `get_problem_summary`; `verification-policy.md → Verification depth levels`) |
+| **Quick-fix BSL** | `recall` (`project-memory.md`, first eligible reader); the target module / procedure and any directly referenced helper needed to understand the change | The validator chain of the active `VERIFICATION_DEPTH` on the touched module (default `standard`: `revalidate_objects` → `get_project_errors`; `verification-policy.md → Verification depth levels`) |
 | **Full-cycle BSL** | Common preamble below; `search_in_code` for local patterns; `get_metadata_details` / `get_metadata_objects` when metadata shape affects the code; platform / БСП / ITS docs only when a versioned API or standard matters | The validator chain; impact analysis when public surface or metadata usage changed (`verification-gates.md → Gate 4`) |
 | **Metadata / forms** | Similar object / form examples (`get_objects_by_tags`), metadata lookup; **the mutation goes through the `1c-metadata-manage` skill** (hard gate, `AGENTS.md → Skills and Subagents`; on EDT projects the typed `edt-mcp` API) | `revalidate_objects` → `get_project_errors` on the changed FQNs; a form snapshot when layout is the point |
 | **Integrations / platform APIs** | Existing integrations, templates, relevant БСП APIs, platform docs for exact API names and version availability, security requirements | The validator chain; ITS check when relying on an ITS standard |
@@ -22,9 +22,9 @@ Use the smallest set that closes the real context gaps; do not promote a task to
 
 ## Common preamble — every playbook that writes or changes BSL
 
-0. **Platform-capability check** when the task enters a specialized domain (cryptography, СЛАУ / numerical methods, data analysis, collaboration system / bots, integration bus / queues, full-text search, regex, …) — `AGENTS.md → MCP Tool Calling → A.7`.
+0. **Platform-capability check** when the task enters a specialized domain (cryptography, СЛАУ / numerical methods, data analysis, collaboration system / bots, integration bus / queues, full-text search, regex, …) — `mcp-policy.md → A.7`.
 1. **`recall`** with the task's key terms — `content/rules/project-memory.md`.
-2. **`templatesearch`** — task text verbatim; a hit is the base — `AGENTS.md → MCP Tool Calling → A.8–A.9`.
+2. **`templatesearch`** — task text verbatim; a hit is the base — `mcp-policy.md → A. Priority and obligation`, items 8–9.
 
 The steps below assume the preamble is done. Validator steps are `revalidate_objects` (+ `validate_query` for new query text) → `get_project_errors` → `get_check_description` / `get_problem_summary` within `verification-policy.md → Validator budget`.
 
@@ -36,7 +36,7 @@ Load `content/rules/coding-standards.md` first; forms — `forms.md`; non-trivia
 2. `search_in_code` — existing patterns in the configuration; `get_module_structure` / `read_method_source` — the module you will edit and an existing routine to reuse.
 3. `get_metadata_objects` / `get_metadata_details` — attribute names and types; `get_content_assist` — members of a context.
 4. `docinfo` (exact name) / `docsearch` (by description) — built-in functions; `ssl_search` — reusable БСП functions.
-5. Validator chain; then `validate_query` for every new / non-trivial query string, especially after AI generation.
+5. Validator chain; then `validate_query` (`edt-mcp`, offline) for every new / non-trivial query string, especially after AI generation.
 
 ## Code Review
 
@@ -70,7 +70,7 @@ Method — `standards(name="systematic-debugging")` (`DEBUG_FAST_PATH` for direc
 0. If the slow artifact is or contains a query — `query-design.md` and `content/skills/1c-metadata-manage/docs/query-optimization.md → Mandatory Optimization Checklist`, item by item, even when no MCP server is exposed.
 1. `search_in_code` (literal fragments of slow patterns) — slow patterns; `get_method_call_hierarchy` — hot chains; `find_references` — cascades; `start_profiling` → `stop_profiling` → `get_profiling_results` — measure instead of guessing.
 2. `get_metadata_details` — indexes and structure; establish the baseline result and the measured bottleneck.
-3. Reuse the common preamble's `templatesearch` result as the base when it fits; search again only for a newly identified gap. `v8std_search` (`v8std-local`) — applicable ITS performance standards **before** choosing the rewrite. Confirm the candidate preserves row multiplicity, values and other required behaviour.
+3. Reuse the common preamble's `templatesearch` result as the base when it fits; search again only for a newly identified gap. `v8std_search` → `v8std_get_page` (`v8std-local`) — applicable ITS performance standards **before** choosing the rewrite. Confirm the candidate preserves row multiplicity, values and other required behaviour.
 4. Adapt the matching template; run the validator chain after the edit.
 5. `validate_query` → a bounded read-only live comparison (`evaluate_expression`, test or copy IB) — compare results with the baseline, including duplicates and overlapping conditions, then compare performance. Parsing alone proves neither metadata resolution nor result equivalence (`verification-gates.md → Gate 3a`).
 

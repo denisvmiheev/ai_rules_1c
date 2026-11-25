@@ -17,17 +17,19 @@ Modification markers are used **only when modifying typical (standard) code** in
 ### Format
 - Opening comment: value of `{COMMENT_OPEN}` from `.dev.env`
 - Closing comment: value of `{COMMENT_CLOSE}` from `.dev.env`
+- The template values already start with `//`: insert them as they are, never prefix another `//`
+- `{DATE}` — the date format of the module's existing markers; otherwise `dd.MM.yyyy`
 - A space is mandatory after `//`
 
 ### Typical Code Modification
 Removed typical code — **comment out, DO NOT delete**:
 
 ```bsl
-// {COMMENT_OPEN}
+{COMMENT_OPEN}
 НовоеЗначение = {PREFIX}ПреобразоватьЗначение(Значение1);
 // ТиповаяПроцедура(Значение1, Значение2);
 ТиповаяПроцедура(НовоеЗначение, Значение2);
-// {COMMENT_CLOSE}
+{COMMENT_CLOSE}
 ```
 
 ### New Procedures in Typical Modules
@@ -35,10 +37,10 @@ Comment is placed **inside** the procedure, after the header:
 
 ```bsl
 Функция НоваяФункция(Параметр) Экспорт
-	// {COMMENT_OPEN}
+	{COMMENT_OPEN}
 	// ... code ...
 	Возврат Результат;
-	// {COMMENT_CLOSE}
+	{COMMENT_CLOSE}
 КонецФункции
 ```
 
@@ -47,20 +49,20 @@ In modules of new objects (with `{PREFIX}`) — markers per method are **NOT NEE
 
 ### General Rules
 - `TODO` / `FIXME` must contain a task reference: `// TODO No.14752: description`
-- **Pseudo-regions via comments are PROHIBITED** — use only `#Область` / `#КонецОбласти`
+- Module regions and the ban on pseudo-regions — `module-structure.md`
 
 ## 4. Metadata Naming
 
 | Element | Rule |
 |---|---|
-| New metadata objects | Prefix `{PREFIX}` in name (e.g., `{PREFIX}ContractAmount`) |
+| New metadata objects | Prefix `{PREFIX}` in name (e.g., `{PREFIX}СуммаДоговора`) |
 | Object synonyms | No prefix. If conflicts — add `({COMPANY})` |
 | New roles | Prefix `{PREFIX}` |
-| Subsystems | `{PREFIX}AddedObjects` and `{PREFIX}ModifiedObjects` |
+| Subsystems | `{PREFIX}ДобавленныеОбъекты` and `{PREFIX}ИзмененныеОбъекты` |
 | Attributes of typical objects | Prefix `{PREFIX}` |
 | Form elements on typical forms | Prefix `{PREFIX}` |
 
-**When `PREFIX` is empty in `.dev.env`** — the placeholder `{PREFIX}` resolves to an empty string in every rule above (e.g. `{PREFIX}ContractAmount` → `ContractAmount`, `{PREFIX}AddedObjects` → `AddedObjects`). The `({COMPANY})` synonym disambiguator also disappears if `COMPANY` is empty. See `dev-standards-env.md §1 → "Advisory parameters"`.
+**When `PREFIX` is empty in `.dev.env`** — the placeholder `{PREFIX}` resolves to an empty string in every rule above (e.g. `{PREFIX}СуммаДоговора` → `СуммаДоговора`, `{PREFIX}ДобавленныеОбъекты` → `ДобавленныеОбъекты`). The `({COMPANY})` synonym disambiguator also disappears if `COMPANY` is empty. See `dev-standards-env.md §1 → "Advisory parameters"`.
 
 **Inside non-typical (new) objects** (name already has `{PREFIX}`):
 - Attributes, tabular sections, form elements, commands, procedures — **WITHOUT prefix**

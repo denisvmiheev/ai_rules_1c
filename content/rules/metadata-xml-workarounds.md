@@ -1,5 +1,5 @@
 ---
-description: Common XML generation pitfalls for 1C metadata and managed forms (`TabularSection` `LineNumber`, `PagesGroupExtInfo` typo, `Page.enabled`, UID uniqueness, post-edit validation). Load when authoring or fixing metadata XML or `Form.xml` by hand.
+description: Hand-edited metadata XML pitfalls — UID uniqueness, validation, EDT review traps. Load only under a skill exception or when reviewing broken metadata XML.
 alwaysApply: false
 category: metadata
 ---
@@ -8,11 +8,13 @@ category: metadata
 
 Concrete recurring mistakes when generating or editing 1C metadata XML / MDO and managed-form XML by hand or with scripts. Apply when authoring metadata XML directly (rather than via the `1c-metadata-manage` skill).
 
-> **Hand-editing is the exception, not a parallel path.** Mutating metadata XML goes through the `1c-metadata-manage` skill or the `1c-metadata-manager` subagent (see `content/agents/metadata-manager.md`) — hard gate per `AGENTS.md → Skills and Subagents`. This file applies only inside the documented exceptions (`content/skills/1c-metadata-manage/SKILL.md → Hard rule`: one-line fix, skill unavailable) and for reviewing existing files.
+> **Hand-editing is the exception, not a parallel path.** Mutating metadata XML goes through the `1c-metadata-manage` skill or the `1c-metadata-manager` subagent (see `content/agents/metadata-manager.md`) — hard gate per `AGENTS.md → Skills and Subagents`. This file applies only inside the documented exceptions (`content/skills/1c-metadata-manage/SKILL.md → Hard rule`: one-line fix, skill unavailable; an existing role is changed by `role-edit`) and for reviewing existing files.
 
 > **Never use hand-editing to get around a support refusal.** If the skill's tools refused the edit because the object belongs to a typical configuration on vendor support and is locked ("на замке"), that refusal holds here too: a direct XML edit silently breaks future vendor updates. The answer is an extension (`cfe-borrow` / `cfe-patch-method`) or a deliberate support-state change via `support-edit` — canon: `content/skills/1c-metadata-manage/docs/support-manage.md`. A configuration on support is recognizable by `Ext/ParentConfigurations.bin` next to `Configuration.xml`.
 
 ---
+
+> **Sections 1–3 show EDT-format syntax (`*.mdo`, `*.form`).** Those files are never hand-edited (`content/rules/edt-workflow.md → The one thing that really changes: source format`): use the three traps to recognise a broken file in review and route the fix through EDT. A Designer `Form.xml` spells these elements differently (`<Pages>`, `<Page>`), so do not look for them there. Sections 4–5 apply to both formats.
 
 ## 1. TabularSections — no `LineNumber` standard attribute
 
@@ -69,9 +71,10 @@ All UIDs and UUIDs of new metadata objects, attributes, tabular sections must be
 - Generate each UUID separately via `[guid]::NewGuid()` (PowerShell) or `uuid.uuid4()` (Python).
 - Never reuse a UUID by copy-paste.
 - Never use placeholder / sequential UUIDs (`a1b2c3d4...`, `b2c3d4e5...`).
-- After bulk metadata generation, run a duplicate-UUID check across the source tree.
+- After bulk metadata generation, run the duplicate-UUID check across the source tree (`/check-uuid`, `content/skills/1c-metadata-manage/docs/uuid-check.md`).
+- Keep the BOM and the line endings of an edited file as they were.
 
-When adding metadata objects — also update `Configuration.xml` (`<childObjects>` ordering matters).
+When adding metadata objects — also update `Configuration.xml` (`<ChildObjects>` ordering matters).
 
 ---
 

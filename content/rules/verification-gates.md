@@ -1,12 +1,12 @@
 ---
-description: Verification execution gates for BSL and metadata — evidence reuse, syntax, logic, style, impact analysis, XML validation, and the platform batch check before an infobase apply
+description: "Closing gates for BSL and metadata — evidence reuse, syntax, logic, style, impact, XML, platform batch check. Load before declaring a full-cycle change done, or for a gate a quick-fix does not carry."
 alwaysApply: false
 category: quality
 ---
 
 # Verification Gates — BSL, Impact, and Metadata
 
-**When to load this file:** before validating or declaring a BSL / metadata change done. Determine depth and promotion triggers first via `verification-policy.md`.
+**When to load this file:** before validating or declaring a full-cycle BSL / metadata change done. Determine depth and promotion triggers first via `verification-policy.md`; a quick-fix closes on that file's *Quick-fix gate* and comes here only for a missing validator or the procedure of Gate 3a / 4 / 5 / 6.
 
 Delivery-only soft gates and the final report contract live in `verification-delivery.md`.
 
@@ -25,14 +25,14 @@ The parent closing gate MUST reuse that evidence when the current fingerprint an
 context match the recorded state. Checking a fingerprint or reading the edit target is allowed;
 it is not a repeated validator run.
 It runs only missing or stale gates and MUST NOT repeat a validator against unchanged content
-(`AGENTS.md → MCP Tool Calling → C.1`). Any later edit invalidates the affected validator
+(`mcp-policy.md → C.1`). Any later edit invalidates the affected validator
 evidence; the final editor becomes the new owner. The same rule applies to `revalidate_objects`
 and impact-analysis evidence.
 
 
 ## Hard gates — run on every full-cycle change
 
-You MUST run all five gates in order. Each gate has an explicit pass / fail criterion and an explicit retry budget. When a required validator is not exposed in the current session, follow the graceful-degradation subsections (after Gate 3 and inside Gate 4) instead of silently skipping. **Gates 3a and 6 are conditional** — each runs only when its own trigger fires and its prerequisite (an exposed server, or a reachable platform + infobase) is present; neither ever replaces Gates 1–3.
+You MUST run every applicable gate, in order. Gates 1–3 are selected by the task path and depth (next paragraph); Gates 3a, 4, 5 and 6 each run when their own trigger fires. Each gate has an explicit pass / fail criterion and an explicit retry budget. When a required validator is not exposed in the current session, follow the graceful-degradation subsections (after Gate 3 and inside Gate 4) instead of silently skipping. **Gates 3a and 6 also need a prerequisite** (an exposed server, or a reachable platform + infobase); neither ever replaces Gates 1–3.
 
 The gate descriptions below state the `full` behaviour — the strictest level. When `VERIFICATION_DEPTH` is `standard` or `lite`, Gates 1–3 are modulated per `verification-policy.md → "Verification depth levels"`, promotion-trigger paths included: they are full-cycle and keep the `full` retry budget, but their gates follow the active depth.
 
@@ -68,14 +68,7 @@ The gate descriptions below state the `full` behaviour — the strictest level. 
 Apply `TOOL_EDT` (`content/rules/mcp-policy.md → Tool availability`) at the active depth. An unavailable `required` validator blocks its gate. For `auto` absence/failure or `off`, use the compensation below and report the actual reason; policy never produces a passing verdict:
 
 1. Record: *"Gate N unverified — `<tool>` (`<server>`): `<disabled by policy / not exposed / failed / unsuitable scope>`."*
-2. Compensate with what is available. **The platform itself is the first fallback** when `PLATFORM_PATH` and `INFOBASE_PATH` are configured **and the checked configuration contains the current artifact**. Establish the source-to-IB match per `content/rules/designer-batch-checks.md → Bind the check to the current artifact` before running its check ladder. `/CheckModules` supplies syntax / context evidence for the loaded modules; `/CheckConfig` supplies structural evidence, not a replacement for business-logic or ITS review. Record the artifact fingerprint, target, platform / modes, process exit code, log path and `/DumpResult` code. A pass against an older configuration never verifies local changes. If a matching dev/test state cannot be established through an authorized workflow, record that limitation and use manual syntax review (paired keywords, directives, parameter lists) for Gate 1 and the internal checklist for Gates 2–3.
-
-   **Minimum internal review checklist.** These independent checks remain available when a validator is missing. They do not reproduce a routed standard or prove compliance with standards that were not retrieved through MCP; report that evidence gap and follow `content/rules/help-corpus-retrieval.md` for any required standard.
-
-   - **Quick-fix** — correctness and edge cases of the changed fragment; plus locks / transactions when the edit sits near transactional code. That is enough — do not run the full checklist on a 10-line fix.
-   - **Full-cycle** — the full list: style, readability, correctness, edge cases, security, concurrency / locks / transactions, BSL-LS compliance.
-   - Always consider whether an external transaction already exists (e.g. an object-write transaction) before opening a new one.
-   - Findings follow `verification-policy.md → Validator budget` (a blocking defect needs a clean confirming run on the changed state; style noise does not start another loop; budget exhausted = unverified).
+2. Compensate with what is available. **The platform itself is the first fallback** when `PLATFORM_PATH` and `INFOBASE_PATH` are configured **and the checked configuration contains the current artifact**: bind the artifact and run the check ladder per `content/rules/designer-batch-checks.md → Bind the check to the current artifact` (`/CheckModules` for syntax/context; `/CheckConfig` for structural evidence — not business-logic or ITS review; pass against an older configuration never verifies local edits). Record fingerprint, target, platform/modes, exit code, log path and `/DumpResult`. Without a verified dev/test match, record that limitation and run manual syntax review (paired keywords, directives, parameter lists) for Gate 1 and the internal review checklist (`standards(name="dev-standards-code-style") §8`: quick-fix — changed fragment + nearby locks/transactions; full-cycle — full list + outer-transaction check) for Gates 2–3. Manual checks never prove compliance with unretrieved routed standards (`content/rules/help-corpus-retrieval.md`) and follow `verification-policy.md → Validator budget`.
 3. `auto`/`off` allow delivery with these limitations; `required` leaves the dependent verification incomplete. A transactional / metadata / public-API change without Gate 2 needs a follow-up validation run.
 
 Skipping a gate without recording it under Risks is a defect — the same rule as Gate 4's graceful degradation below.
@@ -95,8 +88,8 @@ Gate 3a supplies narrowly scoped evidence from a dev/test infobase. Distinguish 
 - **Query text → `validate_query`** (`dcsMode=true` for СКД). Pass criterion: no errors. It parses the query and resolves it against the project's metadata; it does **not** execute it, check parameter values or evaluate RLS.
 - **Result correctness → expected-value comparison.** Only when a concrete correctness question is open: `get_applications` → `launch` → `evaluate_expression` (read-only) against a dev / test IB, and compare returned rows / values against the stated scenario; record the infobase state and the technical user's rights. A run under the technical user does not prove RLS behaviour for other users. `evaluate_expression` without an expected-value comparison proves absence of a runtime exception only.
 - **Pure function →** a **read-only** `evaluate_expression` fragment returning the expected value.
-- **Mutations are out of scope for this gate.** No `Записать()` / `Удалить()` / `НачалоТранзакции` / register movements — the read-only discipline and consent rules of `content/skills/1c-live-ib/SKILL.md → Safety` apply unchanged. If confirming the change requires a mutation, that is a task for `1c-tester` against a test base, not for this gate.
-- **Budget:** one call per applicable tool / artifact state; run only the checks needed to close an open question. Re-run after a relevant artifact or test-state change only — the no-change-repeat rule (`AGENTS.md → MCP Tool Calling → C.1`) applies.
+- **Mutations are out of scope for this gate.** No `Записать()` / `Удалить()` / `НачатьТранзакцию` / register movements — the read-only discipline and consent rules of `content/skills/1c-live-ib/SKILL.md → Safety` apply unchanged. If confirming the change requires a mutation, that is a task for `1c-tester` against a test base, not for this gate.
+- **Budget:** one call per applicable tool / artifact state; run only the checks needed to close an open question. Re-run after a relevant artifact or test-state change only — the no-change-repeat rule (`mcp-policy.md → C.1`) applies.
 
 **Failure is blocking for the artifact,** the same as a Gate 1 `ERRORS` finding: fix the query / fragment and re-run once against the changed state.
 
@@ -136,26 +129,19 @@ Skip this gate **only** when no metadata object was touched.
 
 There is **no XSD / raw-XML validator** on `edt-mcp`. Metadata correctness is enforced by the typed mutation API plus EDT's own validation:
 
+- **Changed-file set.** Check every object/file the mutation changed, not only the ones passed to the tools: mutations also update registrations (`Configuration.mdo`, owner objects, subsystem content). Confirm the set from `git status` against its state before your first write; explain any changed file outside the plan (`content/skills/1c-metadata-manage/SKILL.md → Plan unit`) and revert only your own write.
 - **`revalidate_objects(objects=[FQNs])`** for every changed object — it refreshes from disk first, so it also covers `.mdo` / `.form` files edited by hand or by an external tool.
 - **`get_project_errors(objects=[FQNs])`** — pass criterion: zero `ERRORS` / `BLOCKER` items on the changed objects. `md-reference-intergrity` "lost reference" findings block `update_database` and are fixed with `resync_to_disk` (report first; `cleanDanglingReferences=true` only when the dangling entries are confirmed garbage).
 - **Execution-path check.** Metadata mutations (new objects, attributes, tabular sections, forms, layouts, roles, DCS) must have gone through the `1c-metadata-manage` skill / `1c-metadata-manager` subagent — hard gate per `AGENTS.md → Skills and Subagents`, which on `edt-mcp` means `create_metadata` / `modify_metadata` / `delete_metadata` / `rename_metadata_object` / `adopt_metadata_object`. If hand edits of `.mdo` / `.form` were used, this gate passes only when the exception is one of those documented in `SKILL.md → Hard rule` **and** is stated in the delivery summary (`Metadata tooling: hand-edit — <exception>`); additionally cross-check `metadata-xml-workarounds.md` for the recurring traps. Hand-edited metadata without a stated documented exception is a gate failure — the same class as a skipped validator.
 - **Destructive operations are two-phase.** `delete_metadata` and `rename_metadata_object` must be run once without `confirm` (preview of every change point / every reference that would be cleaned), reviewed, and only then with `confirm=true`. A `force=true` delete that leaves dangling references requires an explicit note in the delivery summary.
 - **For form changes:** `validate_form_model` on the form FQN (structural defects computed from the current model — broken data paths, buttons without commands, handlers without procedures); confirm the result with `get_metadata_details` on the form FQN (structure) and, when layout is the point of the change, `get_form_layout_snapshot` / `get_form_screenshot` (both need EDT started with `-DnativeFormBufferedLayoutRender=true`; a blank result is a missing JVM flag, not a pass).
-- **EDT-format sources (`USE_EDT=true`, MDO tree)** — this is the default shape here: `edt-mcp`'s `revalidate_objects` → `get_project_errors` / `get_problem_summary` **is** the metadata validation for `*.mdo` / `*.form`, recorded in the delivery summary as a validator result. Canon — `content/rules/edt-workflow.md → Validation`.
+- **EDT-format sources (`USE_EDT=true`, MDO tree)** — this is the default shape here: `edt-mcp`'s `revalidate_objects` → `get_project_errors` / `get_problem_summary` **is** the metadata validation for `*.mdo` / `*.form`, recorded in the delivery summary as a validator result (hand-edited `*.mdo` is a gate failure with no exception; Gates 1–3 on `.bsl` are unchanged; never run the Designer batch ladder as a second deployment owner). Canon — `content/rules/edt-workflow.md → Validation`.
 - **Form load on the platform** is evidence EDT validation does not give. When the change reaches an infobase, Gate 6 (`/CheckConfig` on the loaded configuration) supplies it; otherwise record under **Risks**: *"Form load not verified on the platform — open `<form>` in the client / run `/CheckConfig` before release."* Never claim the form opens without that evidence.
-
 
 ### Gate 6 — Platform batch check (only when the change reaches an infobase)
 
-Gates 1–5 read source. They cannot answer the question the platform answers: does this configuration or extension **apply** to the target infobase. Run this gate when either trigger fires:
+Run before applying an **extension** (`/deploy-and-test`, `/update1cbase`, `/restore-testbase`, `/build-release`, `db-ops` — catches broken `&Вместо` / `&ИзменениеИКонтроль` interceptors via `/CheckCanApplyConfigurationExtensions`) or before applying a **main configuration** when changes exceed MCP validator coverage (full-snapshot deploy, large refactor, release build).
 
-1. **An extension is about to be applied** to an infobase — by `/deploy-and-test`, `/update1cbase`, `/restore-testbase`, `/build-release`, or a `db-ops` load. A `&Вместо` / `&ИзменениеИКонтроль` interceptor naming a method that no longer exists in the vendor original passes Gates 1–5 untouched: the source is well-formed and the XML is schema-valid. Only `/CheckCanApplyConfigurationExtensions` sees it.
-2. **The main configuration is about to be loaded and applied**, and the change touched metadata or module code that the MCP validators did not cover (a whole-snapshot deploy, a large refactor, a release build).
+Procedure, artifact binding, ladder (`/CheckModules` → `/CheckCanApplyConfigurationExtensions` → `/CheckConfig`), three-signal verdict (exit code + `/DumpResult` + `/Out`; warnings fail) and evidence reuse — `content/rules/designer-batch-checks.md`. Record fingerprint, source-to-IB match, target, platform/modes, exit code, log path and `/DumpResult`.
 
-Execution and pass criterion — `content/rules/designer-batch-checks.md`: first bind the current artifact to the checked configuration, then the ladder (`/CheckModules` → `/CheckCanApplyConfigurationExtensions` → `/CheckConfig`), stop at the first failure, and the **three-signal verdict** (process exit code + `/DumpResult` + `/Out` diagnostics). Success phrases neutralize only their own fragment, never other diagnostics on the same line. Warnings fail this gate — `-WarningsAsErrors` will reject the same content at apply time.
-
-Evidence includes the artifact fingerprint and source-to-IB match, target configuration / extension,
-platform / modes, process exit code, log path and `/DumpResult` code. Reuse it only while the
-artifact and relevant target state still match; a later load or source edit invalidates it.
-
-**When the trigger fired but the gate could not run** (no `PLATFORM_PATH` / `INFOBASE_PATH`, or the base is production and no dev/test copy is available), record one line under **Risks**: *"Gate 6 not run — `<reason>`; extension applicability was not verified against an infobase."* Delivery is not blocked, but an extension change delivered without it must be flagged as unverified against a real base. This gate never substitutes for Gates 1–5.
+**When triggered but unable to run** (no `PLATFORM_PATH` / `INFOBASE_PATH`, or production IB with no dev/test copy), add under **Risks**: *"Gate 6 not run — `<reason>`; extension applicability was not verified against an infobase."* Delivery is not blocked, but the gap must be explicit. Never substitutes for Gates 1–5.

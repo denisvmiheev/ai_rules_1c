@@ -116,8 +116,8 @@ No hand-written XML: metadata is created and edited through a typed FQN API that
 
 ## Tags and translation
 
-| Tool | Purpose |
-|---|---|
+| Tool | Purpose | When to use |
+|---|---|---|
 | **get_tags** / **get_objects_by_tags** | Tag-based object discovery — find comparable existing objects / forms as examples |
 
 ## Comparison — three-way, read-only
@@ -195,4 +195,4 @@ Other rulesets and older notes name the classic multi-server distribution's tool
 - **The model is the authority, the disk lags.** `resync_to_disk` flushes model → disk and reports desync. Reconcile before mixing `edt-mcp` with file-level tools, and never alternate owners on one artifact — canon: `content/rules/edt-workflow.md → Model vs disk — the synchronization rule`.
 - **Debug / profiling / `launch` / `update_database` / `infobase_sessions terminate` act on a real application.** Confirm the target is a dev / test base first, exactly as the deployment slash commands require.
 - **`import_configuration_from_xml` creates a new project**, it does not update the current one. Confirm with the user before any export/import round trip.
-- **Budget rules are unchanged** (`content/rules/mcp-policy.md` section C): no repeated calls against unchanged state, and EDT markers do not open a retry loop of their own. `get_mcp_history` shows what this session already asked — use it instead of re-running a call to remember its result.
+- **Budget rules are unchanged** (`mcp-policy.md → B.1`, `C.1`): no repeated calls against unchanged state, and EDT markers do not open a new retry loop of their own. `get_mcp_history` shows what this session already asked — use it instead of re-running a call to remember its result.

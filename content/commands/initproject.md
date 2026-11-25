@@ -10,7 +10,7 @@ Produce the working layout every other full-cycle command relies on: main-config
 
 Read `content/rules/extension-workspace.md`: one project and settings file, separate source roots per target, separate binary output. For a new empty Designer project with no established path choices, persist `EXPORT_PATH=src/cf` and `EXTENSIONS_PATH=src/cfe`; retain existing configured layouts. Do not create a separate project/settings copy per extension. If MCP setup is part of the request, map these roots to the `projectName` of each contour in `edt-mcp` (`list_projects`); a directory layout alone does not establish that EDT holds the project.
 
-**EDT guard.** This command lays out a **Designer XML dump**. If `.dev.env` `USE_EDT=true` — or the directory already holds an EDT workspace (`.project`, `DT-INF/`, `src/Configuration.mdo`) — stop and settle the layout with the user first: which tree is authoritative, and whether the XML dump goes into a separate directory. Never initialize a dump on top of an EDT workspace. Canon — `content/rules/edt-workflow.md → The one thing that really changes: source format`.
+**EDT guard.** This command lays out a **Designer XML dump**. If `.dev.env` `USE_EDT=true` — or the directory already holds an EDT workspace (`.project`, `DT-INF/`, `src/Configuration/Configuration.mdo`, possibly in a subdirectory) — stop and settle the layout with the user first: which tree is authoritative, and whether the XML dump goes into a separate directory. Never initialize a dump on top of an EDT workspace. Canon — `content/rules/edt-workflow.md → The one thing that really changes: source format`.
 
 **Double-init guard.** If `{EXPORT_PATH}` already contains dumped sources (`Configuration.xml` at its root), the project is already initialized — stop and suggest `/loadfrom1cbase` (refresh sources from the IB) or `/restore-testbase` (refresh the IB from sources) instead. Re-initializing over an existing dump requires an explicit user request.
 
@@ -46,7 +46,7 @@ On a dump error, follow that command's result-check step — show the log fragme
 ## Step 4. Git repository and the first commit
 
 1. If the project directory is not a git repository — run `git init`.
-2. Ensure `.gitignore` exists and covers at least `.dev.env`, local `build/` output and the resolved `{RELEASE_PATH}`. Extend an existing `.gitignore`, never overwrite it.
+2. Ensure `.gitignore` exists and covers at least `.dev.env`, `.v8-xsd/` (platform XSD schemas, 1C-Soft property — `{V8_XSD_PATH}` when set), local `build/` output and the resolved `{RELEASE_PATH}`. Extend an existing `.gitignore`, never overwrite it.
 3. Create the first snapshot commit (e.g. `init: 1C configuration sources (cf + cfe)`). If the repository **already had commits**, ask the user before committing on top of the existing history.
 
 ## Step 5. Final report
